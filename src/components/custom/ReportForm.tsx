@@ -967,7 +967,7 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                                         <FormControl>
                                             <div className="flex gap-2 items-center">
                                                 <Input type="color" className="w-12 h-10 p-1" {...field} />
-                                                <span className="text-sm text-gray-500">{field.value}</span>
+                                                <span className="text-sm text-gray-500" suppressHydrationWarning>{field.value || ''}</span>
                                             </div>
                                         </FormControl>
                                         <FormMessage />
