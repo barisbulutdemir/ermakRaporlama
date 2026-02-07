@@ -171,9 +171,9 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
 
             {/* Footer - Signature (Bottom Right) */}
             <div style={{ position: 'absolute', bottom: '20mm', right: '20mm', textAlign: 'center', width: '150px' }}>
-                <div style={{ borderBottom: '1px solid #000', marginBottom: '5px', paddingBottom: '30px' }}>
+                <div style={{ borderBottom: '1px solid #000', marginBottom: '8px', paddingBottom: '10px' }}>
                     {signatureDataUrl ? (
-                        <img src={signatureDataUrl} alt="İmza" style={{ maxHeight: '40px', maxWidth: '100%' }} />
+                        <img src={signatureDataUrl} alt="İmza" style={{ maxHeight: '70px', maxWidth: '100%' }} />
                     ) : (
                         <span style={{ color: '#ccc' }}>İmza Yok</span>
                     )}
