@@ -80,7 +80,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   `
 
     return (
-        <div className="max-w-[210mm] mx-auto bg-white p-6 text-black print-container">
+        <div className="max-w-[210mm] mx-auto bg-white p-6 text-black print-container overflow-hidden">
             <style>{printStyles}</style>
 
             <div className="flex justify-end gap-2 mb-8 no-print">

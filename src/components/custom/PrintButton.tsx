@@ -20,8 +20,8 @@ export function PrintButton() {
                 scale: 2,
                 useCORS: true,
                 logging: false,
-                width: element.scrollWidth,
-                height: element.scrollHeight
+                width: element.offsetWidth,
+                height: element.offsetHeight
             })
 
             // Show no-print elements again
