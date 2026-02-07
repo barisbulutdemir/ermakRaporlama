@@ -118,18 +118,32 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                         <div style={{ marginBottom: '5px' }}>
                             <span style={{ fontWeight: 'bold' }}>Gidiş Tarihi: </span>
                             <span>{format(new Date(data.dateRange.from), 'dd.MM.yyyy')}</span>
-                            {/* Note: We rely on pre-calculation or passed helpers if we wanted 'Included/Excluded' logic here, 
-                                but simplistic logic: if we don't have isExcluded helper, we might skip it or pass it differently. 
-                                For now, let's omit the (Çalışıldı/Çalışılmadı) text here or assume it's Working unless noted, 
-                                OR if strictly needed, we can keep the helper approach JUST for this, but simplistic approach is better.
-                                Actually, user only complained about the Mesailer section. 
-                                Let's keep it simple. If we want to keep that text, we need the helper or pass it in data.
-                                Let's assume for now we just show dates. The user didn't mention this part.
-                            */}
+                            {(() => {
+                                const departureDate = format(new Date(data.dateRange.from), 'yyyy-MM-dd')
+                                const isExcluded = data.excludedDates?.some(
+                                    (d) => format(new Date(d), 'yyyy-MM-dd') === departureDate
+                                )
+                                return (
+                                    <span style={{ marginLeft: '8px', fontSize: '11pt', color: '#555' }}>
+                                        {isExcluded ? '(çalışılmadı)' : '(çalışıldı)'}
+                                    </span>
+                                )
+                            })()}
                         </div>
                         <div>
                             <span style={{ fontWeight: 'bold' }}>Dönüş Tarihi: </span>
                             <span>{format(new Date(data.dateRange.to), 'dd.MM.yyyy')}</span>
+                            {(() => {
+                                const returnDate = format(new Date(data.dateRange.to), 'yyyy-MM-dd')
+                                const isExcluded = data.excludedDates?.some(
+                                    (d) => format(new Date(d), 'yyyy-MM-dd') === returnDate
+                                )
+                                return (
+                                    <span style={{ marginLeft: '8px', fontSize: '11pt', color: '#555' }}>
+                                        {isExcluded ? '(çalışılmadı)' : '(çalışıldı)'}
+                                    </span>
+                                )
+                            })()}
                         </div>
                     </div>
                 )}
