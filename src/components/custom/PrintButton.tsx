@@ -11,56 +11,68 @@ export function PrintButton() {
         if (!element) return
 
         try {
-            // Hide no-print elements
-            const noPrintElements = document.querySelectorAll('.no-print')
+            // Create a "Clean Room" container
+            // This isolates the report from dashboard grid/flex layouts
+            const cleanContainer = document.createElement('div')
+            cleanContainer.style.position = 'absolute'
+            cleanContainer.style.top = '-9999px'
+            cleanContainer.style.left = '0'
+            cleanContainer.style.width = '210mm' // Force A4 width
+            cleanContainer.style.backgroundColor = '#ffffff'
+            cleanContainer.style.zIndex = '-1'
+
+            // Clone the report content 
+            // We clone the NODE to keep event listeners etc (though not needed for print)
+            // But we need to make sure styles are applied. 
+            // Since we use Tailwind, classes are global.
+            const clonedContent = element.cloneNode(true) as HTMLElement
+
+            // Force styles on the cloned content to ensure it fits
+            clonedContent.style.width = '100%'
+            clonedContent.style.height = 'auto'
+            clonedContent.style.maxHeight = '280mm' // Strict limit
+            clonedContent.style.overflow = 'hidden'
+            clonedContent.style.margin = '0'
+            clonedContent.style.padding = '20px'
+
+            // Remove 'print-container' class to avoid any page-specific CSS that might interfere
+            // clonedContent.classList.remove('print-container') 
+
+            // Append to body to render
+            cleanContainer.appendChild(clonedContent)
+            document.body.appendChild(cleanContainer)
+
+            // Hide no-print elements within the clone
+            const noPrintElements = cleanContainer.querySelectorAll('.no-print')
             noPrintElements.forEach(el => (el as HTMLElement).style.display = 'none')
 
-            // Capture the element as canvas
-            const canvas = await html2canvas(element, {
+            // Capture the CLEAN container
+            const canvas = await html2canvas(cleanContainer, {
                 scale: 2,
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff', // Force white background
-                // CRITICAL FIX: Force the CAPTURE height to be exactly one page
-                // We use onclone to modify the element before screenshot
-                onclone: (clonedDoc) => {
-                    const clonedElement = clonedDoc.querySelector('.print-container') as HTMLElement
-                    if (clonedElement) {
-                        // Hard limit height to 275mm (slightly less than A4 297mm)
-                        // This physically cuts off anything that would cause a 2nd page
-                        clonedElement.style.height = '275mm'
-                        clonedElement.style.maxHeight = '275mm'
-                        clonedElement.style.overflow = 'hidden'
-                        clonedElement.style.margin = '0'
-                        clonedElement.style.padding = '20px' // Ensure padding is consistent
-                    }
-                }
+                backgroundColor: '#ffffff',
+                height: Math.min(cleanContainer.offsetHeight, 1150) // Limit height in pixels (~300mm)
             })
 
-            // Show no-print elements again
-            noPrintElements.forEach(el => (el as HTMLElement).style.display = '')
-
-            // Calculate dimensions
-            const PAGE_WIDTH = 210 // A4 width in mm
-            const PAGE_HEIGHT = 297 // A4 height in mm
-            const MARGIN = 0 // No margin needed since we handle it in capture
-
-            const imgWidth = 210
-            const imgHeight = (canvas.height * imgWidth) / canvas.width
+            // Clean up DOM
+            document.body.removeChild(cleanContainer)
 
             // Create PDF (Standard A4)
             const pdf = new jsPDF('p', 'mm', 'a4')
-            const imgData = canvas.toDataURL('image/png')
+            const imgWidth = 210
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-            // Add image fitting the page
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+            // Add image
+            // Note: Since we limited the container to 280mm, it should fit perfectly.
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight)
 
-            // SAFETY: Delete extra pages if any (just in case)
+            // SAFETY: Delete extra pages if any
             while (pdf.getNumberOfPages() > 1) {
                 pdf.deletePage(2)
             }
 
-            // Download with timestamp to prevent caching
+            // Download with timestamp
             pdf.save(`servis-raporu-${Date.now()}.pdf`)
         } catch (error) {
             console.error('PDF oluşturma hatası:', error)
