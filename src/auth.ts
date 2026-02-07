@@ -50,6 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         async session({ session, token }) {
             if (token.sub && session.user) {
                 session.user.name = token.name as string
+                session.user.username = token.name as string
                 session.user.role = token.role as string
             }
             return session
