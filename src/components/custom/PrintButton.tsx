@@ -20,8 +20,11 @@ export function PrintButton() {
                 scale: 2,
                 useCORS: true,
                 logging: false,
+                backgroundColor: '#ffffff', // Force white background
                 width: element.offsetWidth,
-                height: element.offsetHeight
+                height: element.offsetHeight,
+                windowWidth: element.scrollWidth, // Prevent responsive layout shifts
+                windowHeight: element.scrollHeight
             })
 
             // Show no-print elements again
@@ -36,15 +39,22 @@ export function PrintButton() {
             const pdf = new jsPDF('p', 'mm', 'a4')
             const imgData = canvas.toDataURL('image/png')
 
-            // If content is taller than A4, scale it down to fit
-            if (imgHeight > pageHeight) {
-                const scale = pageHeight / imgHeight
+            // STRICT SCALING: Always fit to page with margin
+            const MAX_HEIGHT = 285 // Leave ~12mm margin at bottom
+
+            if (imgHeight > MAX_HEIGHT) {
+                const scale = MAX_HEIGHT / imgHeight
                 const scaledWidth = imgWidth * scale
-                const scaledHeight = pageHeight - 1 // Subtract 1mm to prevent new page due to rounding
+                const scaledHeight = MAX_HEIGHT
                 const xOffset = (imgWidth - scaledWidth) / 2
                 pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, scaledHeight)
             } else {
                 pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+            }
+
+            // SAFETY: Delete extra pages if any (just in case)
+            while (pdf.getNumberOfPages() > 1) {
+                pdf.deletePage(2)
             }
 
             // Download
