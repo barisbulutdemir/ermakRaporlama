@@ -30,34 +30,45 @@ export function PrintButton() {
             // Show no-print elements again
             noPrintElements.forEach(el => (el as HTMLElement).style.display = '')
 
-            // Calculate dimensions for A4 width
-            const imgWidth = 210 // A4 width in mm
+            // Calculate dimensions
+            const PAGE_WIDTH = 210 // A4 width in mm
+            const PAGE_HEIGHT = 297 // A4 height in mm
+            const MARGIN = 10 // 10mm margin
+            const MAX_CONTENT_HEIGHT = PAGE_HEIGHT - (MARGIN * 2) // Safe printable area height
+
+            const imgWidth = 210
             const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-            // DEBUG INFO
-            alert(`Sayfa Yüksekliği: ${imgHeight.toFixed(1)}mm (A4: 297mm)`)
-
-            // Create PDF with CUSTOM PAGE SIZE to fit content exactly
-            // This guarantees single page, no matter how long the content is
-            const pdfHeight = imgHeight + 10 // Add 10mm margin just in case
-            const pdf = new jsPDF({
-                orientation: 'p',
-                unit: 'mm',
-                format: [imgWidth, pdfHeight] // Dynamic height!
-            })
-
+            // Create PDF (Standard A4)
+            const pdf = new jsPDF('p', 'mm', 'a4')
             const imgData = canvas.toDataURL('image/png')
 
-            // Add image at full size since page is sized to fit it
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+            // FORCE FIT TO SINGLE PAGE
+            let finalWidth = imgWidth
+            let finalHeight = imgHeight
+
+            // If content is taller than safe area, scale it down
+            if (finalHeight > MAX_CONTENT_HEIGHT) {
+                const ratio = MAX_CONTENT_HEIGHT / finalHeight
+                finalWidth = imgWidth * ratio
+                finalHeight = MAX_CONTENT_HEIGHT
+            }
+
+            // Start at top margin to avoid cutting off header
+            // Center horizontally if scaled down width < A4 width
+            const x = (PAGE_WIDTH - finalWidth) / 2
+            const y = MARGIN
+
+            // Add image with calculated dimensions
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight)
 
             // SAFETY: Delete extra pages if any (just in case)
             while (pdf.getNumberOfPages() > 1) {
                 pdf.deletePage(2)
             }
 
-            // Download
-            pdf.save('servis-raporu.pdf')
+            // Download with timestamp to prevent caching
+            pdf.save(`servis-raporu-${Date.now()}.pdf`)
         } catch (error) {
             console.error('PDF oluşturma hatası:', error)
             alert('PDF oluşturulurken bir hata oluştu')
