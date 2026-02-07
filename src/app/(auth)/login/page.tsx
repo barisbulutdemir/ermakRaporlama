@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import Link from 'next/link'
 import { authenticate } from '@/app/actions/auth'
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +54,13 @@ export default function LoginPage() {
                         <Button type="submit" className="w-full">
                             Giriş Yap
                         </Button>
+
+                        <div className="text-center text-sm">
+                            <span className="text-muted-foreground">Hesabınız yok mu? </span>
+                            <Link href="/register" className="text-primary hover:underline">
+                                Kayıt Ol
+                            </Link>
+                        </div>
                     </form>
                 </CardContent>
             </Card>

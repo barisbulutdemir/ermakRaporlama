@@ -8,15 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String
-  name      String?
-  signature String?  // Base64 signature image
-  role      String   @default("USER") // "ADMIN", "USER"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  reports   ServiceReport[]
+  id          String    @id @default(cuid())
+  username    String    @unique
+  password    String
+  name        String?
+  signature   String?   // Base64 signature image
+  role        String    @default("USER") // "ADMIN", "USER"
+  approved    Boolean   @default(false)
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  reports     ServiceReport[]
 }
 
 model ServiceReport {

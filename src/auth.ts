@@ -30,6 +30,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     const user = await getUser(username)
                     if (!user) return null
 
+                    // Check if user is approved
+                    if (!user.approved) {
+                        console.log("User not approved")
+                        throw new Error("Your account is pending admin approval.")
+                    }
+
                     const passwordsMatch = await bcrypt.compare(password, user.password)
                     if (passwordsMatch) return user
                 }
@@ -44,16 +50,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     callbacks: {
         async session({ session, token }) {
-            console.log("Session Callback:", { session, token })
             if (token.sub && session.user) {
-                session.user.name = token.name
+                session.user.name = token.name as string
+                session.user.role = token.role as string
             }
             return session
         },
         async jwt({ token, user }) {
-            console.log("JWT Callback:", { token, user })
             if (user) {
-                token.name = user.username // or user.name
+                token.name = user.username
+                token.role = user.role
             }
             return token
         }

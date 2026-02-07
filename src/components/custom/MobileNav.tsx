@@ -4,14 +4,18 @@ import Link from 'next/link'
 import {
     LayoutDashboard,
     FilePlus,
-    Settings
+    Settings,
+    Users
 } from 'lucide-react'
 
 interface MobileNavProps {
     userName: string
+    userRole: string
 }
 
-export function MobileNav({ userName }: MobileNavProps) {
+export function MobileNav({ userName, userRole }: MobileNavProps) {
+    const isAdmin = userRole === 'ADMIN'
+
     return (
         <div className="md:hidden fixed top-0 left-0 right-0 z-50 border-b bg-background h-[60px]">
             <nav className="flex items-center justify-center gap-8 h-full px-4">
@@ -36,6 +40,15 @@ export function MobileNav({ userName }: MobileNavProps) {
                     <Settings className="h-6 w-6" />
                     <span className="text-xs">Ayarlar</span>
                 </Link>
+                {isAdmin && (
+                    <Link
+                        href="/admin/users"
+                        className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <Users className="h-6 w-6" />
+                        <span className="text-xs">Kullanıcılar</span>
+                    </Link>
+                )}
             </nav>
         </div>
     )

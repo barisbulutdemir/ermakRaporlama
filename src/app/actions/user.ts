@@ -1,104 +1,205 @@
-"use server"
+'use server'
 
-import { auth } from "@/auth"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
-import { revalidatePath } from "next/cache"
+import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
+import bcrypt from 'bcrypt'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
-export async function updateUserProfile(formData: FormData) {
+// Check if current user is admin
+async function requireAdmin() {
     const session = await auth()
-    if (!session?.user?.name) {
-        return { success: false, message: "Oturum bulunamadı" }
+    if (!session?.user || session.user.role !== 'ADMIN') {
+        throw new Error('Unauthorized: Admin access required')
     }
+    return session
+}
 
-    const name = formData.get("name") as string
-
-    if (!name || name.trim().length === 0) {
-        return { success: false, message: "Ad soyad boş olamaz" }
-    }
+// Approve a pending user
+export async function approveUser(userId: string) {
+    const session = await requireAdmin()
 
     try {
         await prisma.user.update({
-            where: { username: session.user.name },
-            data: { name: name.trim() }
+            where: { id: userId },
+            data: {
+                approved: true,
+                approvedBy: session.user.name || 'admin',
+                approvedAt: new Date(),
+            },
         })
 
-        revalidatePath("/settings")
-        revalidatePath("/dashboard")
-        return { success: true, message: "Profil güncellendi" }
+        revalidatePath('/admin/users')
+        return { success: true }
     } catch (error) {
-        console.error("Profile update error:", error)
-        return { success: false, message: "Güncelleme sırasında hata oluştu" }
+        console.error('Error approving user:', error)
+        return { success: false, error: 'Failed to approve user' }
     }
 }
 
-export async function updateSignature(signatureData: string | null) {
-    const session = await auth()
-    if (!session?.user?.name) {
-        return { success: false, message: "Oturum bulunamadı" }
+// Delete a user
+export async function deleteUser(userId: string) {
+    await requireAdmin()
+
+    try {
+        await prisma.user.delete({
+            where: { id: userId },
+        })
+
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error('Error deleting user:', error)
+        return { success: false, error: 'Failed to delete user' }
     }
+}
+
+// Update user role
+export async function updateUserRole(userId: string, role: 'ADMIN' | 'USER') {
+    await requireAdmin()
 
     try {
         await prisma.user.update({
-            where: { username: session.user.name },
-            data: { signature: signatureData }
+            where: { id: userId },
+            data: { role },
         })
 
-        revalidatePath("/settings")
-        revalidatePath("/reports/new")
-        return { success: true, message: "İmza güncellendi" }
+        revalidatePath('/admin/users')
+        return { success: true }
     } catch (error) {
-        console.error("Signature update error:", error)
-        return { success: false, message: "İmza güncellenirken hata oluştu" }
+        console.error('Error updating user role:', error)
+        return { success: false, error: 'Failed to update user role' }
     }
 }
 
-export async function updatePassword(formData: FormData) {
-    const session = await auth()
-    if (!session?.user?.name) {
-        return { success: false, message: "Oturum bulunamadı" }
-    }
+// Reset user password (admin only)
+export async function resetUserPassword(userId: string, newPassword: string) {
+    await requireAdmin()
 
-    const currentPassword = formData.get("currentPassword") as string
-    const newPassword = formData.get("newPassword") as string
-    const confirmPassword = formData.get("confirmPassword") as string
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-        return { success: false, message: "Tüm alanları doldurun" }
-    }
-
-    if (newPassword.length < 8) {
-        return { success: false, message: "Yeni şifre en az 8 karakter olmalı" }
-    }
-
-    if (newPassword !== confirmPassword) {
-        return { success: false, message: "Yeni şifreler eşleşmiyor" }
+    if (newPassword.length < 6) {
+        return { success: false, error: 'Password must be at least 6 characters' }
     }
 
     try {
-        const user = await prisma.user.findUnique({
-            where: { username: session.user.name }
-        })
-
-        if (!user || !user.password) {
-            return { success: false, message: "Kullanıcı bulunamadı" }
-        }
-
-        const isValidPassword = await bcrypt.compare(currentPassword, user.password)
-        if (!isValidPassword) {
-            return { success: false, message: "Mevcut şifre yanlış" }
-        }
-
         const hashedPassword = await bcrypt.hash(newPassword, 10)
+
         await prisma.user.update({
-            where: { username: session.user.name },
-            data: { password: hashedPassword }
+            where: { id: userId },
+            data: { password: hashedPassword },
         })
 
-        revalidatePath("/settings")
-        return { success: true, message: "Şifre başarıyla değiştirildi" }
+        revalidatePath('/admin/users')
+        return { success: true }
     } catch (error) {
-        console.error("Password update error:", error)
-        return { success: false, message: "Şifre değiştirme sırasında hata oluştu" }
+        console.error('Error resetting password:', error)
+        return { success: false, error: 'Failed to reset password' }
+    }
+}
+
+// Create user (admin only, auto-approved)
+export async function createUser(data: {
+    username: string
+    password: string
+    name: string
+    role: 'ADMIN' | 'USER'
+}) {
+    const session = await requireAdmin()
+
+    if (data.password.length < 6) {
+        return { success: false, error: 'Password must be at least 6 characters' }
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(data.password, 10)
+
+        const user = await prisma.user.create({
+            data: {
+                username: data.username,
+                password: hashedPassword,
+                name: data.name,
+                role: data.role,
+                approved: true, // Admin-created users are auto-approved
+                approvedBy: session.user.name || 'admin',
+                approvedAt: new Date(),
+            },
+        })
+
+        revalidatePath('/admin/users')
+        return { success: true, user }
+    } catch (error: any) {
+        console.error('Error creating user:', error)
+        if (error.code === 'P2002') {
+            return { success: false, error: 'Username already exists' }
+        }
+        return { success: false, error: 'Failed to create user' }
+    }
+}
+
+// Get all users (admin only)
+export async function getAllUsers() {
+    await requireAdmin()
+
+    try {
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                username: true,
+                name: true,
+                role: true,
+                approved: true,
+                approvedBy: true,
+                approvedAt: true,
+                createdAt: true,
+            },
+            orderBy: [
+                { approved: 'asc' }, // Pending users first
+                { createdAt: 'desc' },
+            ],
+        })
+
+        return { success: true, users }
+    } catch (error) {
+        console.error('Error fetching users:', error)
+        return { success: false, error: 'Failed to fetch users', users: [] }
+    }
+}
+
+// Register new user (public, requires approval)
+export async function registerUser(data: {
+    username: string
+    password: string
+    name: string
+}) {
+    if (data.password.length < 6) {
+        return { success: false, error: 'Password must be at least 6 characters' }
+    }
+
+    if (!data.username || data.username.length < 3) {
+        return { success: false, error: 'Username must be at least 3 characters' }
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(data.password, 10)
+
+        await prisma.user.create({
+            data: {
+                username: data.username,
+                password: hashedPassword,
+                name: data.name,
+                role: 'USER',
+                approved: false, // Requires admin approval
+            },
+        })
+
+        return {
+            success: true,
+            message: 'Registration successful! Your account is pending admin approval.'
+        }
+    } catch (error: any) {
+        console.error('Error registering user:', error)
+        if (error.code === 'P2002') {
+            return { success: false, error: 'Username already exists' }
+        }
+        return { success: false, error: 'Failed to register user' }
     }
 }
