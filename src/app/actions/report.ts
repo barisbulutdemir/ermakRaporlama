@@ -3,7 +3,6 @@
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 // Define schema for validation
@@ -32,6 +31,12 @@ const formSchema = z.object({
     extraTime50: z.number().default(0),
     extraTime100: z.number().default(0),
     holidayTime100: z.number().default(0),
+    attachments: z.array(z.object({
+        fileName: z.string(),
+        filePath: z.string(),
+        fileType: z.string(),
+        fileSize: z.number()
+    })).optional()
 })
 
 export type FormState = {
@@ -41,42 +46,19 @@ export type FormState = {
 
 export async function createReport(prevState: FormState, formData: any) {
     const session = await auth()
-    if (!session?.user?.email && !session?.user?.name) { // Adapt based on what we store
-        // We stored username in token.name in auth.ts
-        // Actually we verify by just checking session.user
-    }
 
     if (!session?.user) {
         return { message: 'Unauthorized' }
     }
 
-    // Username is in session.user.name (mapped from token.name which is user.username)
+    // Username is in session.user.name
     const username = session.user.name
     if (!username) return { message: 'User not found' }
 
     const user = await prisma.user.findUnique({ where: { username } })
     if (!user) return { message: 'User not found in DB' }
 
-    // Manual parsing because formData is complex JSON sent from client component usually?
-    // Or if we use standard formData with server actions, passing arrays is tricky.
-    // Best to passing raw data from client component's transition or hidden inputs.
-    // Actually, for complex forms, it's easier to pass the data object directly if using bind,
-    // OR just receive the state and use the second argument as the PAYLOAD if invoked directly.
-    // BUT useActionState hook sends FormData.
-
-    // Let's assume the client sends a JSON string in a hidden field 'data' 
-    // OR we define the action to take (prevState, payload) and call it from a transition, not directly as form action
-    // BUT useActionState expects (state, payload). 
-
-    // Actually, simpler: define action as `formAction(payload: z.infer<typeof formSchema>)`
-    // and use it in `startTransition`.
-
-    // However, I'll stick to receiving the object directly since I'll call it from client code.
-    // Note: Server actions can be called like functions.
-
-    // Wait, `createReport` signature for useActionState is `(state, payload)`.
-
-    const validatedFields = formSchema.safeParse(formData) // formData here is the payload if we call it effectively
+    const validatedFields = formSchema.safeParse(formData)
 
     if (!validatedFields.success) {
         return {
@@ -116,10 +98,19 @@ export async function createReport(prevState: FormState, formData: any) {
                         currency: e.currency,
                         description: e.description
                     }))
+                },
+                attachments: {
+                    create: data.attachments?.map(a => ({
+                        fileName: a.fileName,
+                        filePath: a.filePath,
+                        fileType: a.fileType,
+                        fileSize: a.fileSize
+                    }))
                 }
             }
         })
         revalidatePath('/dashboard')
+        revalidatePath('/reports')
         return { message: 'Success', reportId: report.id } // Return ID instead of redirecting
     } catch (error) {
         console.error('Failed to create report:', error)
@@ -144,13 +135,11 @@ export async function updateReport(reportId: string, formData: any) {
     const data = validatedFields.data
 
     try {
-        // We delete Related records (Advances, Expenses) and recreate them
-        // This is a simple strategy for full update.
-        // Wrap in transaction if possible, but simple sequential operations are okay here.
-
+        // We delete Related records (Advances, Expenses, Attachments) and recreate them
         await prisma.$transaction([
             prisma.advance.deleteMany({ where: { reportId } }),
             prisma.expense.deleteMany({ where: { reportId } }),
+            prisma.reportAttachment.deleteMany({ where: { reportId } }),
             prisma.serviceReport.update({
                 where: { id: reportId },
                 data: {
@@ -179,12 +168,21 @@ export async function updateReport(reportId: string, formData: any) {
                             currency: e.currency,
                             description: e.description
                         }))
+                    },
+                    attachments: {
+                        create: data.attachments?.map(a => ({
+                            fileName: a.fileName,
+                            filePath: a.filePath,
+                            fileType: a.fileType,
+                            fileSize: a.fileSize
+                        }))
                     }
                 }
             })
         ])
 
         revalidatePath('/dashboard')
+        revalidatePath('/reports')
         revalidatePath(`/reports/${reportId}`)
         return { message: 'Success', reportId: reportId }
     } catch (error) {
@@ -202,6 +200,7 @@ export async function deleteReport(reportId: string) {
             where: { id: reportId }
         })
         revalidatePath('/dashboard')
+        revalidatePath('/reports')
         return { success: true }
     } catch (error) {
         console.error("Failed to delete report", error)

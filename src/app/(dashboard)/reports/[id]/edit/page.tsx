@@ -16,7 +16,8 @@ export default async function EditReportPage({ params }: { params: Promise<{ id:
         include: {
             advances: true,
             expenses: true,
-            user: true
+            user: true,
+            attachments: true
         }
     })
 

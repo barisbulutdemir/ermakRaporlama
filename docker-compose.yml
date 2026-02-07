@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  ermak-rapor-app:
+    # If building locally on Unraid:
+    build: .
+    # If pushing to a registry (recommended for Unraid):
+    # image: your-dockerhub-username/ermak-rapor-app:latest
+    container_name: ermak-rapor-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/prisma/dev.db
+      # Add other env vars here (e.g., AUTH_SECRET, etc.)
+      # You should generate a strong secret for AUTH_SECRET
+      - AUTH_SECRET=change_me_to_a_random_string_at_least_32_chars
+    volumes:
+      # Persist SQLite database
+      - ./prisma:/app/prisma
+      # Persist uploaded files
+      - ./public/uploads:/app/public/uploads

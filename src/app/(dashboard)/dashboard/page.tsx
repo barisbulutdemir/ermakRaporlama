@@ -35,8 +35,11 @@ export default async function DashboardPage() {
             />
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Son Raporlar</CardTitle>
+                    <Link href="/reports" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                        Tümünü Gör
+                    </Link>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
@@ -44,7 +47,7 @@ export default async function DashboardPage() {
                             <p className="text-muted-foreground text-sm">Henüz rapor oluşturmadınız.</p>
                         ) : (
                             reports.map(report => (
-                                <Link key={report.id} href={`/reports/${report.id}`} className="block">
+                                <Link key={report.id} href={`/reports/${report.id}/edit`} className="block">
                                     <div className="flex items-center justify-between border-b pb-2 last:border-0 hover:bg-muted/50 p-2 rounded-md transition-colors">
                                         <div className="space-y-1">
                                             <p className="text-sm font-medium leading-none">{report.siteName}</p>

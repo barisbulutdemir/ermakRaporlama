@@ -54,6 +54,21 @@ model ServiceReport {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  
+  attachments   ReportAttachment[]
+}
+
+model ReportAttachment {
+  id        String        @id @default(cuid())
+  reportId  String
+  report    ServiceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  
+  fileName  String
+  filePath  String        // Relative path in public/uploads or equivalent
+  fileType  String        // mime type
+  fileSize  Int
+  
+  createdAt DateTime      @default(now())
 }
 
 model Advance {

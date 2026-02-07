@@ -3,12 +3,8 @@ import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { isSameDay, eachDayOfInterval } from 'date-fns'
 
-// Helper function definitions (duplicated here or imported if available in a utils file)
-// For simplicity and isolation, we'll keep them self-contained or import if they are simple pure functions.
-// Ideally, the 'data' prop should contain everything pre-formatted to avoid logic duplication.
-
 interface ReportPdfTemplateProps {
-    data: any // using any for now to match the form structure, can be typed strictly later
+    data: any
     specialDaysData?: {
         dateStr: string
         dayName: string
@@ -42,14 +38,16 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
             style={{
                 width: '210mm',
                 minHeight: '297mm',
-                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
                 backgroundColor: '#ffffff',
                 color: '#000000',
-                padding: '20mm',
+                padding: '20mm', // Standard padding
                 boxSizing: 'border-box',
                 fontFamily: 'Arial, Helvetica, sans-serif',
                 fontSize: '12pt',
-                lineHeight: '1.5'
+                lineHeight: '1.5',
+                position: 'relative' // Ensure containment
             }}
         >
             <style dangerouslySetInnerHTML={{
@@ -60,26 +58,26 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                 }
             `}} />
 
-            {/* Header - Absolute Positioning for Name/Date to move them into margins */}
-            <div style={{ position: 'relative', height: '40px', marginBottom: '30px' }}>
-                {/* Name - Top Left (into margin) */}
-                <div style={{ position: 'absolute', top: '-15mm', left: '-10mm', textAlign: 'left' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '12pt' }}>{data.userName}</div>
+            {/* Header - Flexbox Layout */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '30px', width: '100%' }}>
+                {/* Name */}
+                <div style={{ textAlign: 'left', fontWeight: 'bold', fontSize: '12pt', width: '30%' }}>
+                    {data.userName}
                 </div>
 
-                {/* Site Name - Center (Flow) */}
-                <div style={{ width: '100%', textAlign: 'center', paddingTop: '0px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '16pt' }}>{data.siteName}</div>
+                {/* Site Name */}
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16pt', width: '40%' }}>
+                    {data.siteName}
                 </div>
 
-                {/* Date - Top Right (into margin) */}
-                <div style={{ position: 'absolute', top: '-15mm', right: '-10mm', textAlign: 'right' }}>
-                    <div style={{ fontSize: '12pt' }}>{format(new Date(), 'dd.MM.yyyy')}</div>
+                {/* Date */}
+                <div style={{ textAlign: 'right', fontSize: '12pt', width: '30%' }}>
+                    {format(new Date(), 'dd.MM.yyyy')}
                 </div>
             </div>
 
-            {/* Body Content */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* Body Content - Flex Grow to push footer down */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}>
 
                 {/* Advances */}
                 {advancesText && (
@@ -112,7 +110,6 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                 )}
 
                 {/* Dates */}
-                {/* We assume data.dateRange is valid per prop types but optional chaining is safe */}
                 {data.dateRange?.from && data.dateRange?.to && (
                     <div style={{ marginTop: '10px', fontSize: '12pt' }}>
                         <div style={{ marginBottom: '5px' }}>
@@ -148,6 +145,22 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                     </div>
                 )}
 
+                {/* Summary Stats Row */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginTop: '15px', fontSize: '11pt', borderTop: '1px solid #000', borderBottom: '1px solid #000', padding: '8px 0' }}>
+                    {data.totalWorkingDays > 0 && (
+                        <div><span style={{ fontWeight: 'bold' }}>Toplam Çalışma:</span> {data.totalWorkingDays} gün</div>
+                    )}
+                    {data.extraTime50 > 0 && (
+                        <div><span style={{ fontWeight: 'bold' }}>Toplam Cumartesi:</span> {data.extraTime50} saat</div>
+                    )}
+                    {data.extraTime100 > 0 && (
+                        <div><span style={{ fontWeight: 'bold' }}>Toplam Pazar:</span> {data.extraTime100} saat</div>
+                    )}
+                    {data.holidayTime100 > 0 && (
+                        <div><span style={{ fontWeight: 'bold' }}>Toplam Resmi Tatil:</span> {data.holidayTime100} saat</div>
+                    )}
+                </div>
+
                 {/* Overtime Grid */}
                 {specialDaysData.length > 0 && (
                     <div style={{ marginTop: '20px' }}>
@@ -169,8 +182,8 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
             </div>
 
 
-            {/* Footer - Signature (Bottom Right) */}
-            <div style={{ position: 'absolute', bottom: '20mm', right: '20mm', textAlign: 'center', width: '150px' }}>
+            {/* Footer - Use marginTop auto to push to bottom */}
+            <div style={{ marginTop: 'auto', alignSelf: 'flex-end', textAlign: 'center', width: '150px' }}>
                 <div style={{ borderBottom: '1px solid #000', marginBottom: '8px', paddingBottom: '5px' }}>
                     {signatureDataUrl ? (
                         <img src={signatureDataUrl} alt="İmza" style={{ maxHeight: '70px', maxWidth: '100%' }} />

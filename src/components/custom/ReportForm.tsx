@@ -7,6 +7,7 @@ import { z } from 'zod'
 import Link from 'next/link'
 import { STATIC_HOLIDAYS } from "@/lib/holidays"
 import { createReport, deleteReport, updateReport } from '@/app/actions/report'
+import { uploadFiles } from '@/app/actions/upload'
 import { getOfficialHolidays } from '@/app/actions/holiday'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar"
 import { format, eachDayOfInterval, isSameDay } from "date-fns"
 import { tr } from "date-fns/locale"
-import { Trash2, PlusCircle, Check } from "lucide-react"
+import { Trash2, PlusCircle, Check, Upload, X, Share2, FileText, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -38,9 +39,9 @@ const formSchema = z.object({
     siteName: z.string().min(1, 'Şantiye adı gereklidir'),
     siteColor: z.string().optional(),
     dateRange: z.object({
-        from: z.date(),
+        from: z.date().optional(),
         to: z.date().optional(),
-    }).refine((data) => data.to != null, { message: "Bitiş tarihi seçilmelidir" }),
+    }).refine((data) => !!data.from && !!data.to, { message: "Tarih aralığı seçilmelidir" }),
     excludedDates: z.array(z.date()).optional(),
     advances: z.array(z.object({
         amount: z.coerce.number().min(0, 'Tutar 0 dan büyük olmalı'),
@@ -99,9 +100,9 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                 // Fetch official holidays for this range to be 100% sure we have descriptions
                 let fetchedHolidays: any[] = []
                 try {
-                    const holidayResult = await getOfficialHolidays(from, to)
-                    if (holidayResult.success && holidayResult.data) {
-                        fetchedHolidays = holidayResult.data
+                    const holidays = await getOfficialHolidays(from, to)
+                    if (holidays && Array.isArray(holidays)) {
+                        fetchedHolidays = holidays
                     }
                 } catch (e) {
                     console.error("PDF generation holiday fetch error", e)
@@ -225,10 +226,15 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
             let heightLeft = imgHeight
             let position = 0
 
+            // 1. First Page
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
             heightLeft -= pageHeight
 
-            while (heightLeft > 0) {
+            // 2. Additional Pages (only if remaining content is significant)
+            // If leftover is just whitespace (e.g. footer margin, empty space), ignore it
+            // Tolerance: 100mm (~1/3 of page) to be extremely safe
+            // If leftover is less than 100mm (10cm), do not add a new page.
+            while (heightLeft >= 100) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
@@ -270,7 +276,7 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
     }
 
     const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(formSchema) as any,
         defaultValues: initialData ? {
             userName: initialData.userName || initialData.user?.name || '',
             siteName: initialData.siteName || '',
@@ -305,7 +311,7 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
             extraTime50: 0,
             extraTime100: 0,
             holidayTime100: 0,
-        },
+        } as any,
     })
 
     // Signature is handled via defaultSignature prop from parent component
@@ -336,6 +342,220 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
 
     const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
     const [newExpense, setNewExpense] = useState<{ amount: string, currency: 'TL' | 'USD' | 'EUR', description: string }>({ amount: '', currency: 'TL', description: '' })
+
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
+
+    // Attachments State
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+    const [existingAttachments, setExistingAttachments] = useState<any[]>(initialData?.attachments || [])
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files!)])
+        }
+    }
+
+    const removeFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const removeExistingAttachment = (index: number) => {
+        setExistingAttachments(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const handleShareAll = async () => {
+        try {
+            toast.loading("Dosyalar hazırlanıyor...")
+
+            // 1. Generate PDF
+            const data = form.getValues()
+            const ReactDOMServer = (await import('react-dom/server')).default
+
+            // Re-use logic or extract it. For now, we'll do a quick generation similar to export
+            // Ideally handleExportPDFNew should return the blob, but it saves it.
+            // Let's refactor handleExportPDFNew slightly or copy logic. 
+            // Copying logic for speed, but simplified for Blob generation only.
+
+            // ... (Special days logic - simplified for brevity, assuming state is correct)
+            // Actually, we can just trigger the PDF generation and intercept the save? No.
+            // Let's just create a helper to get PDF Blob.
+
+            // ... (We will implement a robust getter if needed, but for now let's assume we can share just the PDF or catch the files)
+            // Wait, "Hepsini Paylaş" implies PDF + Attachments.
+
+            // For now, let's just use the SHARE API which needs Files.
+            // We need to fetch existing attachments as blobs.
+
+            const filesToShare: File[] = []
+
+            // A) Generate PDF
+            // We'll call a modified version of export that returns a File object
+            const pdfFile = await generatePdfFile(data)
+            if (pdfFile) filesToShare.push(pdfFile)
+
+            // B) Process Attachments
+            // 1. New selected files (not uploaded yet? No, this is success dialog, so they are uploaded)
+            // Wait, in success dialog, 'selectedFiles' are cleared? No, we should clear them on success.
+            // But we have 'existingAttachments' (which now includes the new ones if we updated state correctly).
+            // Actually, after submit, we revalidate path, but local state 'initialData' might not update immediately unless we refresh or router.refresh takes effect.
+            // However, we should rely on what we just saved.
+
+            // Let's rely on `existingAttachments` + `newAttachmentPaths`?
+            // On success, we should probably update `existingAttachments` with the result of the upload?
+
+            // SIMPLIFICATION: In Success Dialog, we might mostly care about the PDF.
+            // But user asked for "hepsini tek tek indirip whatsapp da paylaşabilir".
+            // If we are in the dialog right after save, we might need to fetch the uploaded files back?
+            // Or just use the local File objects if available?
+            // existingAttachments are remote Config URLs.
+
+            for (const att of existingAttachments) {
+                try {
+                    const response = await fetch(att.filePath)
+                    const blob = await response.blob()
+                    const file = new File([blob], att.fileName, { type: att.fileType })
+                    filesToShare.push(file)
+                } catch (e) {
+                    console.error("Failed to fetch attachment for sharing", att)
+                }
+            }
+
+            if (navigator.share) {
+                await navigator.share({
+                    files: filesToShare,
+                    title: 'Servis Raporu',
+                    text: `${data.siteName} - ${data.userName} Servis Raporu`
+                })
+                toast.dismiss()
+                toast.success("Paylaşım başlatıldı")
+            } else {
+                toast.dismiss()
+                toast.error("Tarayıcınız paylaşım özelliğini desteklemiyor.")
+            }
+
+        } catch (error) {
+            console.error("Share error", error)
+            toast.dismiss()
+            toast.error("Paylaşım hatası")
+        }
+    }
+
+    // Helper to generate PDF File without saving
+    const generatePdfFile = async (data: any): Promise<File | null> => {
+        try {
+            const ReactDOMServer = (await import('react-dom/server')).default
+
+            // Re-calculate special days logic (same as export)
+            const from = data.dateRange?.from
+            const to = data.dateRange?.to
+            let specialDaysData: any[] = []
+
+            if (from && to) {
+                const days = eachDayOfInterval({ start: new Date(from), end: new Date(to) })
+                specialDaysData = days.filter(day => {
+                    if (isExcluded(day)) return false
+                    const isHol = isHoliday(day)
+                    const dayOfW = day.getDay()
+                    return isHol || dayOfW === 0 || dayOfW === 6
+                }).map(day => {
+                    const isHol = isHoliday(day)
+                    let dayName = format(day, 'EEEE', { locale: tr })
+                    const dateStr = format(day, 'dd.MM.yyyy')
+                    let hours = "8 saat"
+
+                    if (isHol) {
+                        const dayKey = format(day, 'yyyy-MM-dd')
+                        const detail = holidayDetails[dayKey]
+                        const isHalf = detail?.isHalfDay
+                        const description = detail?.description
+                        if (description) dayName = description
+                        hours = isHalf ? "4 saat" : "8 saat"
+                    }
+
+                    return {
+                        dateStr,
+                        dayName,
+                        hours,
+                        isHoliday: isHol
+                    }
+                })
+            }
+
+            const signatureDataUrl = defaultSignature || initialData?.workerSignature || ''
+
+            const htmlContent = ReactDOMServer.renderToStaticMarkup(
+                <ReportPdfTemplate data={data} specialDaysData={specialDaysData} signatureDataUrl={signatureDataUrl} />
+            )
+
+            const iframe = document.createElement('iframe')
+            iframe.style.position = 'fixed'
+            iframe.style.left = '-9999px'
+            iframe.style.top = '0'
+            iframe.style.width = '210mm'
+            iframe.style.height = '297mm'
+            iframe.style.border = 'none'
+            document.body.appendChild(iframe)
+
+            const doc = iframe.contentDocument
+            if (!doc) throw new Error("Iframe document not created")
+
+            doc.open()
+            doc.write(`
+                 <html>
+                     <head>
+                         <style>
+                             body { margin: 0; padding: 0; background-color: #ffffff; }
+                         </style>
+                     </head>
+                     <body>
+                         ${htmlContent}
+                     </body>
+                 </html>
+             `)
+            doc.close()
+            await new Promise(resolve => setTimeout(resolve, 500))
+
+            const targetElement = doc.getElementById('pdf-template-root')
+            if (!targetElement) throw new Error("PDF Template root element not found")
+
+            const canvas = await html2canvas(targetElement, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            })
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.8)
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            })
+
+            const imgWidth = 210
+            const pageHeight = 297
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
+            let heightLeft = imgHeight
+            let position = 0
+
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+            heightLeft -= pageHeight
+            while (heightLeft >= 100) {
+                position = heightLeft - imgHeight
+                pdf.addPage()
+                pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+                heightLeft -= pageHeight
+            }
+
+            document.body.removeChild(iframe)
+
+            const blob = pdf.output('blob')
+            return new File([blob], `servis-raporu-${format(new Date(), 'dd-MM-yyyy')}.pdf`, { type: 'application/pdf' })
+        } catch (error) {
+            console.error("PDF generation error", error)
+            return null
+        }
+    }
 
     const handleExportPDFNew = async () => {
         const data = form.getValues()
@@ -405,8 +625,8 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                 })
             }
 
-            // Use default signature if available
-            const signatureDataUrl = defaultSignature || ''
+            // Use default signature or existing signature from edit mode
+            const signatureDataUrl = defaultSignature || initialData?.workerSignature || ''
 
             const htmlContent = ReactDOMServer.renderToStaticMarkup(
                 <ReportPdfTemplate data={data} specialDaysData={specialDaysData} signatureDataUrl={signatureDataUrl} />
@@ -469,10 +689,15 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
             let heightLeft = imgHeight
             let position = 0
 
+            // 1. First Page
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
             heightLeft -= pageHeight
 
-            while (heightLeft > 0) {
+            // 2. Additional Pages (only if remaining content is significant)
+            // If leftover is just whitespace (e.g. footer margin, empty space), ignore it
+            // Tolerance: 100mm (~1/3 of page) to be extremely safe
+            // If leftover is less than 100mm (10cm), do not add a new page.
+            while (heightLeft >= 100) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
@@ -630,9 +855,9 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
 
             // 2. Additional Pages (only if remaining content is significant)
             // If leftover is just whitespace (e.g. footer margin, empty space), ignore it
-            // Tolerance: 80mm (~1/3 of page) to be safe against blank pages
-            // If user has actual content (20 items), it will exceed 80mm easily.
-            while (heightLeft >= 80) {
+            // Tolerance: 100mm (~1/3 of page) to be extremely safe
+            // If leftover is less than 100mm (10cm), do not add a new page.
+            while (heightLeft >= 100) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
@@ -693,6 +918,24 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
         }
 
         startTransition(async () => {
+            // 1. Upload Files if any
+            let uploadedAttachments: any[] = []
+            if (selectedFiles.length > 0) {
+                const formData = new FormData()
+                selectedFiles.forEach(file => formData.append('files', file))
+
+                const uploadRes = await uploadFiles(formData)
+                if (uploadRes.success && uploadRes.files) {
+                    uploadedAttachments = uploadRes.files
+                } else {
+                    toast.error("Dosya yüklenirken hata oluştu")
+                    return // Stop submission? or continue without files? Stop is safer.
+                }
+            }
+
+            // Combine existing (minus deleted) + new uploaded
+            const finalAttachments = [...existingAttachments, ...uploadedAttachments]
+
             // Use default signature or existing signature from edit mode
             const signatureData = defaultSignature || initialData?.workerSignature || ''
 
@@ -705,7 +948,8 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
             const payload = {
                 ...values,
                 dateRange: { from: values.dateRange.from, to: values.dateRange.to as Date },
-                signature: signatureData
+                signature: signatureData,
+                attachments: finalAttachments
             }
 
             let result
@@ -728,11 +972,17 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                 if (!reportId && !createdReportId && result.reportId) {
                     setCreatedReportId(result.reportId)
                 }
+
+                // Update local state to reflect successful save (move selected to existing)
+                if (uploadedAttachments.length > 0) {
+                    setExistingAttachments(finalAttachments)
+                    setSelectedFiles([])
+                }
+
                 toast.success(reportId ? "Rapor güncellendi" : "Rapor başarıyla kaydedildi")
 
-                // If updating, maybe we don't auto-download PDF every time?
-                // But user might expect it. Let's keep it for now.
-                await handleExportPDFNew()
+                // Open success dialog for PDF download option
+                setIsSuccessDialogOpen(true)
             }
         })
     }
@@ -986,18 +1236,19 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                                 render={({ field }) => (
                                     <FormItem className="flex flex-col">
                                         <FormLabel>Servis Tarihleri</FormLabel>
-                                        <div className="border rounded-md p-4 bg-background">
-                                            <Calendar
-                                                mode="range"
-                                                selected={field.value}
-                                                onSelect={field.onChange}
-                                                numberOfMonths={1}
-                                                locale={tr}
-                                                className="w-full flex justify-center"
-                                                modifiers={{ holiday: holidays }}
-                                                modifiersStyles={{ holiday: { color: 'red', fontWeight: 'bold' } }}
-                                            />
-                                        </div>
+                                        <Calendar
+                                            initialFocus
+                                            mode="range"
+                                            defaultMonth={field.value?.from}
+                                            selected={field.value as any}
+                                            onSelect={field.onChange}
+                                            numberOfMonths={1}
+                                            locale={tr}
+                                            className="w-full flex justify-center"
+                                            modifiers={{ holiday: holidays }}
+                                            modifiersStyles={{ holiday: { color: 'red', fontWeight: 'bold' } }}
+                                        />
+
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -1408,6 +1659,63 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                     </CardContent>
                 </Card>
 
+                {/* EKLER / BELGELER */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ekler / Belgeler</CardTitle>
+                        <CardDescription>Raporla ilgili resim, PDF vb. dosyaları ekleyin.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="files">Dosya Seç</Label>
+                            <Input id="files" type="file" multiple onChange={handleFileSelect} className="cursor-pointer" />
+                        </div>
+
+                        {/* Seçilen dosyalar listesi */}
+                        {(selectedFiles.length > 0 || existingAttachments.length > 0) && (
+                            <div className="space-y-2">
+                                <Label>Eklenen Dosyalar</Label>
+                                <div className="border rounded-md divide-y">
+                                    {existingAttachments.map((file, idx) => (
+                                        <div key={`exist-${idx}`} className="flex items-center justify-between p-3 bg-muted/30">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <div className="bg-blue-100 p-2 rounded">
+                                                    <FileText className="w-4 h-4 text-blue-600" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <a href={file.filePath} target="_blank" rel="noopener noreferrer" className="text-sm font-medium truncate hover:underline hover:text-blue-600">
+                                                        {file.fileName}
+                                                    </a>
+                                                    <span className="text-xs text-muted-foreground">Kaydedilmiş</span>
+                                                </div>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeExistingAttachment(idx)}>
+                                                <X className="w-4 h-4 text-muted-foreground hover:text-red-500" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    {selectedFiles.map((file, idx) => (
+                                        <div key={`new-${idx}`} className="flex items-center justify-between p-3">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <div className="bg-green-100 p-2 rounded">
+                                                    <FileText className="w-4 h-4 text-green-600" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-sm font-medium truncate">{file.name}</span>
+                                                    <span className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB (Yüklenecek)</span>
+                                                </div>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(idx)}>
+                                                <X className="w-4 h-4 text-muted-foreground hover:text-red-500" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Rapor Önizleme - Mobile'da üstte, Desktop'ta solda */}
                     <Card className="bg-muted/50 h-full">
@@ -1476,11 +1784,11 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {defaultSignature ? (
+                            {defaultSignature || initialData?.workerSignature ? (
                                 <>
                                     <div className="border rounded-md bg-white p-4 flex items-center justify-center min-h-[150px]">
                                         <img
-                                            src={defaultSignature}
+                                            src={defaultSignature || initialData?.workerSignature}
                                             alt="Kayıtlı İmza"
                                             className="max-h-[120px] object-contain"
                                         />
@@ -1519,6 +1827,62 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
                     {isPending ? 'Oluşturuluyor...' : 'Raporu Kaydet'}
                 </Button>
             </form>
-        </Form>
+
+            <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Rapor Kaydedildi</DialogTitle>
+                        <DialogDescription>
+                            Raporunuz ve ekleri başarıyla hazırlandı. Dosyaları aşağıdan indirebilir veya paylaşabilirsiniz.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2 py-4">
+                        <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-red-100 p-2 rounded">
+                                    <FileText className="w-5 h-5 text-red-600" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="font-medium">Servis Raporu</span>
+                                    <span className="text-xs text-muted-foreground">PDF Dokümanı</span>
+                                </div>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={handleExportPDFNew}>
+                                <Download className="w-4 h-4 mr-2" /> İndir
+                            </Button>
+                        </div>
+
+                        {existingAttachments.map((att, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="bg-blue-100 p-2 rounded">
+                                        <FileText className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-medium truncate max-w-[150px]">{att.fileName}</span>
+                                        <span className="text-xs text-muted-foreground">Ek Dosya</span>
+                                    </div>
+                                </div>
+                                <a href={att.filePath} download target="_blank" rel="noopener noreferrer">
+                                    <Button variant="outline" size="sm">
+                                        <Download className="w-4 h-4 mr-2" /> İndir
+                                    </Button>
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                        <Button variant="outline" onClick={() => setIsSuccessDialogOpen(false)} className="sm:w-auto w-full">
+                            Kapat
+                        </Button>
+                        <Button onClick={handleShareAll} className="gap-2 sm:w-auto w-full">
+                            <Share2 className="w-4 h-4" /> Hepsini Paylaş
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Form >
     )
 }
