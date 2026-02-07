@@ -219,7 +219,7 @@ export async function updateUserProfile(formData: FormData) {
 
     try {
         await prisma.user.update({
-            where: { username: session.user.name },
+            where: { username: session.user.username },
             data: { name: name.trim() },
         })
 
@@ -242,7 +242,7 @@ export async function updateSignature(formData: FormData) {
 
     try {
         await prisma.user.update({
-            where: { username: session.user.name },
+            where: { username: session.user.username },
             data: { signature },
         })
 
@@ -275,7 +275,7 @@ export async function updatePassword(formData: FormData) {
     try {
         // Get current user with password
         const user = await prisma.user.findUnique({
-            where: { username: session.user.name },
+            where: { username: session.user.username },
         })
 
         if (!user) {
@@ -293,7 +293,7 @@ export async function updatePassword(formData: FormData) {
 
         // Update password
         await prisma.user.update({
-            where: { username: session.user.name },
+            where: { username: session.user.username },
             data: { password: hashedPassword },
         })
 
