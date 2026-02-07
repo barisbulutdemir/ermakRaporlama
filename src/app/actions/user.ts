@@ -203,3 +203,104 @@ export async function registerUser(data: {
         return { success: false, error: 'Failed to register user' }
     }
 }
+
+// Update user profile (name) - self-service
+export async function updateUserProfile(formData: FormData) {
+    const session = await auth()
+    if (!session?.user) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const name = formData.get('name') as string
+
+    if (!name || name.trim().length === 0) {
+        return { success: false, error: 'Name is required' }
+    }
+
+    try {
+        await prisma.user.update({
+            where: { username: session.user.name },
+            data: { name: name.trim() },
+        })
+
+        revalidatePath('/settings')
+        return { success: true }
+    } catch (error) {
+        console.error('Error updating profile:', error)
+        return { success: false, error: 'Failed to update profile' }
+    }
+}
+
+// Update user signature - self-service
+export async function updateSignature(formData: FormData) {
+    const session = await auth()
+    if (!session?.user) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const signature = formData.get('signature') as string
+
+    try {
+        await prisma.user.update({
+            where: { username: session.user.name },
+            data: { signature },
+        })
+
+        revalidatePath('/settings')
+        return { success: true }
+    } catch (error) {
+        console.error('Error updating signature:', error)
+        return { success: false, error: 'Failed to update signature' }
+    }
+}
+
+// Update user password - self-service
+export async function updatePassword(formData: FormData) {
+    const session = await auth()
+    if (!session?.user) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const currentPassword = formData.get('currentPassword') as string
+    const newPassword = formData.get('newPassword') as string
+
+    if (!currentPassword || !newPassword) {
+        return { success: false, error: 'All fields are required' }
+    }
+
+    if (newPassword.length < 6) {
+        return { success: false, error: 'New password must be at least 6 characters' }
+    }
+
+    try {
+        // Get current user with password
+        const user = await prisma.user.findUnique({
+            where: { username: session.user.name },
+        })
+
+        if (!user) {
+            return { success: false, error: 'User not found' }
+        }
+
+        // Verify current password
+        const passwordsMatch = await bcrypt.compare(currentPassword, user.password)
+        if (!passwordsMatch) {
+            return { success: false, error: 'Current password is incorrect' }
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+        // Update password
+        await prisma.user.update({
+            where: { username: session.user.name },
+            data: { password: hashedPassword },
+        })
+
+        revalidatePath('/settings')
+        return { success: true }
+    } catch (error) {
+        console.error('Error updating password:', error)
+        return { success: false, error: 'Failed to update password' }
+    }
+}
