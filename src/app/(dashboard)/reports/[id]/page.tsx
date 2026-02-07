@@ -49,9 +49,14 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         margin: 15mm; 
         size: A4 portrait;
       }
+      @page :first {
+        margin: 15mm;
+      }
       body { 
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        margin: 0;
+        padding: 0;
       }
       .no-print { display: none !important; }
       .print-border { border: 1px solid #000; }
@@ -59,13 +64,17 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         height: auto;
         overflow: visible;
       }
-      * {
+      .print-container {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        break-after: avoid;
+        break-inside: avoid;
+        orphans: 9999;
+        widows: 9999;
+      }
+      table, .mb-8, .mb-12 {
         page-break-inside: avoid;
         break-inside: avoid;
-      }
-      .print-container {
-        max-height: 257mm;
-        overflow: hidden;
       }
     }
   `
