@@ -22,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Credentials({
             async authorize(credentials) {
                 const parsedCredentials = z
-                    .object({ username: z.string(), password: z.string().min(6) })
+                    .object({ username: z.string(), password: z.string().min(4) })
                     .safeParse(credentials)
 
                 if (parsedCredentials.success) {
@@ -33,6 +33,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     // Check if user is approved
                     if (!user.approved) {
                         throw new Error("Your account is pending admin approval.")
+                    }
+
+                    if (!user.isActive) {
+                        throw new Error("Your account is inactive.")
                     }
 
                     const passwordsMatch = await bcrypt.compare(password, user.password)
@@ -52,6 +56,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.name = token.name as string
                 session.user.username = token.name as string
                 session.user.role = token.role as string
+                session.user.id = token.sub as string
             }
             return session
         },

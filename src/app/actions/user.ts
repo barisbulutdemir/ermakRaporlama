@@ -39,7 +39,11 @@ export async function approveUser(userId: string) {
 
 // Delete a user
 export async function deleteUser(userId: string) {
-    await requireAdmin()
+    const session = await requireAdmin()
+
+    if (session.user.id === userId) {
+        return { success: false, error: 'Kendi hesabınızı silemezsiniz' }
+    }
 
     try {
         await prisma.user.delete({
@@ -56,7 +60,11 @@ export async function deleteUser(userId: string) {
 
 // Update user role
 export async function updateUserRole(userId: string, role: 'ADMIN' | 'USER') {
-    await requireAdmin()
+    const session = await requireAdmin()
+
+    if (session.user.id === userId) {
+        return { success: false, error: 'Kendi rolünüzü değiştiremezsiniz' }
+    }
 
     try {
         await prisma.user.update({
@@ -76,8 +84,8 @@ export async function updateUserRole(userId: string, role: 'ADMIN' | 'USER') {
 export async function resetUserPassword(userId: string, newPassword: string) {
     await requireAdmin()
 
-    if (newPassword.length < 6) {
-        return { success: false, error: 'Password must be at least 6 characters' }
+    if (newPassword.length < 4) {
+        return { success: false, error: 'Password must be at least 4 characters' }
     }
 
     try {
@@ -137,7 +145,7 @@ export async function createUser(data: {
 
 // Get all users (admin only)
 export async function getAllUsers() {
-    await requireAdmin()
+    const session = await requireAdmin()
 
     try {
         const users = await prisma.user.findMany({
@@ -149,6 +157,7 @@ export async function getAllUsers() {
                 approved: true,
                 approvedBy: true,
                 approvedAt: true,
+                isActive: true,
                 createdAt: true,
             },
             orderBy: [
@@ -157,7 +166,7 @@ export async function getAllUsers() {
             ],
         })
 
-        return { success: true, users }
+        return { success: true, users, currentUserId: session.user.id }
     } catch (error) {
         console.error('Error fetching users:', error)
         return { success: false, error: 'Failed to fetch users', users: [] }
@@ -266,8 +275,8 @@ export async function updatePassword(formData: FormData) {
         return { success: false, error: 'All fields are required' }
     }
 
-    if (newPassword.length < 6) {
-        return { success: false, error: 'New password must be at least 6 characters' }
+    if (newPassword.length < 4) {
+        return { success: false, error: 'New password must be at least 4 characters' }
     }
 
     try {
@@ -300,5 +309,55 @@ export async function updatePassword(formData: FormData) {
     } catch (error) {
         console.error('Error updating password:', error)
         return { success: false, error: 'Failed to update password' }
+    }
+}
+
+// Update user details (admin only)
+export async function updateUserDetails(userId: string, data: { username: string; name: string }) {
+    await requireAdmin()
+
+    if (data.username.length < 3) {
+        return { success: false, error: 'Username must be at least 3 characters' }
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                username: data.username,
+                name: data.name
+            }
+        })
+
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Error updating user details:', error)
+        if (error.code === 'P2002') {
+            return { success: false, error: 'Username already exists' }
+        }
+        return { success: false, error: 'Failed to update user details' }
+    }
+}
+
+// Toggle user active status (admin only)
+export async function toggleUserStatus(userId: string, isActive: boolean) {
+    const session = await requireAdmin()
+
+    if (session.user.id === userId) {
+        return { success: false, error: 'Kendi hesabınızı pasife alamazsınız' }
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { isActive },
+        })
+
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error('Error toggling user status:', error)
+        return { success: false, error: 'Failed to update user status' }
     }
 }

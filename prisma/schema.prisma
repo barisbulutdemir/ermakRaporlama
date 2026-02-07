@@ -15,6 +15,7 @@ model User {
   signature   String?   // Base64 signature image
   role        String    @default("USER") // "ADMIN", "USER"
   approved    Boolean   @default(false)
+  isActive    Boolean   @default(true)  // New: For soft delete / passive mode
   approvedBy  String?
   approvedAt  DateTime?
   createdAt   DateTime  @default(now())
@@ -25,7 +26,7 @@ model User {
 model ServiceReport {
   id            String    @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   siteName      String    // Şantiye Adı
   siteColor     String?   // Şantiye Rengi (Hex code)

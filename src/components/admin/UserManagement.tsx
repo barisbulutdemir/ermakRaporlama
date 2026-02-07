@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getAllUsers, approveUser, deleteUser, updateUserRole, resetUserPassword, createUser } from '@/app/actions/user'
+import { getAllUsers, approveUser, deleteUser, updateUserRole, resetUserPassword, createUser, updateUserDetails, toggleUserStatus } from '@/app/actions/user'
 import { Button } from "@/components/ui/button"
 import {
     Card,
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { CheckCircle, XCircle, Trash2, Key, UserPlus, Shield } from 'lucide-react'
+import { CheckCircle, XCircle, Trash2, Key, UserPlus, Shield, Edit, UserX, UserCheck } from 'lucide-react'
 
 type User = {
     id: string
@@ -47,6 +47,7 @@ type User = {
     approved: boolean
     approvedBy: string | null
     approvedAt: Date | null
+    isActive: boolean
     createdAt: Date
 }
 
@@ -60,6 +61,8 @@ export function UserManagement() {
     const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; userId?: string }>({ open: false })
     const [createDialog, setCreateDialog] = useState(false)
     const [roleDialog, setRoleDialog] = useState<{ open: boolean; userId?: string; currentRole?: string }>({ open: false })
+    const [editDialog, setEditDialog] = useState<{ open: boolean; user?: User }>({ open: false })
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
     useEffect(() => {
         loadUsers()
@@ -70,6 +73,9 @@ export function UserManagement() {
         const result = await getAllUsers()
         if (result.success && result.users) {
             setUsers(result.users as User[])
+            if (result.currentUserId) {
+                setCurrentUserId(result.currentUserId)
+            }
         } else {
             toast.error(result.error || 'Failed to load users')
         }
@@ -77,6 +83,7 @@ export function UserManagement() {
     }
 
     async function handleApprove(userId: string) {
+        if (userId === currentUserId) return
         const result = await approveUser(userId)
         if (result.success) {
             toast.success('Kullanıcı onaylandı')
@@ -96,6 +103,16 @@ export function UserManagement() {
             loadUsers()
         } else {
             toast.error(result.error || 'Silme başarısız')
+        }
+    }
+
+    async function handleToggleStatus(userId: string, currentStatus: boolean) {
+        const result = await toggleUserStatus(userId, !currentStatus)
+        if (result.success) {
+            toast.success(`Kullanıcı ${!currentStatus ? 'aktif' : 'pasif'} yapıldı`)
+            loadUsers()
+        } else {
+            toast.error('Durum değiştirilemedi')
         }
     }
 
@@ -128,6 +145,26 @@ export function UserManagement() {
             loadUsers()
         } else {
             toast.error(result.error || 'Rol güncelleme başarısız')
+        }
+    }
+
+    async function handleEditUser(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault()
+        if (!editDialog.user) return
+
+        const formData = new FormData(e.currentTarget)
+        const data = {
+            username: formData.get('username') as string,
+            name: formData.get('name') as string,
+        }
+
+        const result = await updateUserDetails(editDialog.user.id, data)
+        if (result.success) {
+            toast.success('Kullanıcı güncellendi')
+            setEditDialog({ open: false })
+            loadUsers()
+        } else {
+            toast.error(result.error || 'Güncelleme başarısız')
         }
     }
 
@@ -207,14 +244,14 @@ export function UserManagement() {
                                     <TableHead>Kullanıcı Adı</TableHead>
                                     <TableHead>Ad Soyad</TableHead>
                                     <TableHead>Rol</TableHead>
+                                    <TableHead>Onay</TableHead>
                                     <TableHead>Durum</TableHead>
-                                    <TableHead>Kayıt Tarihi</TableHead>
                                     <TableHead className="text-right">İşlemler</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredUsers.map((user) => (
-                                    <TableRow key={user.id}>
+                                    <TableRow key={user.id} className={!user.isActive ? 'bg-muted/50 opacity-70' : ''}>
                                         <TableCell className="font-medium">{user.username}</TableCell>
                                         <TableCell>{user.name || '-'}</TableCell>
                                         <TableCell>
@@ -224,49 +261,90 @@ export function UserManagement() {
                                         </TableCell>
                                         <TableCell>
                                             {user.approved ? (
-                                                <Badge variant="outline" className="text-green-600 border-green-600">
-                                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                                <Badge variant="outline" className="text-green-600 border-green-600 gap-1">
+                                                    <CheckCircle className="h-3 w-3" />
                                                     Onaylı
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                                                    <XCircle className="h-3 w-3 mr-1" />
+                                                <Badge variant="outline" className="text-yellow-600 border-yellow-600 gap-1">
+                                                    <XCircle className="h-3 w-3" />
                                                     Bekliyor
                                                 </Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            {new Date(user.createdAt).toLocaleDateString('tr-TR')}
+                                            {user.isActive ? (
+                                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100/80">
+                                                    Aktif
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="destructive" className="opacity-80">
+                                                    Pasif
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex gap-2 justify-end">
+                                            <div className="flex gap-1 justify-end">
                                                 {!user.approved && (
                                                     <Button
-                                                        size="sm"
-                                                        variant="outline"
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-8 w-8 text-green-600"
+                                                        title="Onayla"
                                                         onClick={() => handleApprove(user.id)}
                                                     >
-                                                        <CheckCircle className="h-4 w-4 mr-1" />
-                                                        Onayla
+                                                        <CheckCircle className="h-4 w-4" />
                                                     </Button>
                                                 )}
+
                                                 <Button
-                                                    size="sm"
-                                                    variant="outline"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8"
+                                                    title="Düzenle"
+                                                    onClick={() => setEditDialog({ open: true, user })}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8"
+                                                    title={user.isActive ? "Pasif Yap" : "Aktif Yap"}
+                                                    disabled={user.id === currentUserId}
+                                                    onClick={() => handleToggleStatus(user.id, user.isActive)}
+                                                >
+                                                    {user.isActive ? <UserX className="h-4 w-4 text-orange-600" /> : <UserCheck className="h-4 w-4 text-green-600" />}
+                                                </Button>
+
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8"
+                                                    title="Rol Değiştir"
+                                                    disabled={user.id === currentUserId}
                                                     onClick={() => setRoleDialog({ open: true, userId: user.id, currentRole: user.role })}
                                                 >
                                                     <Shield className="h-4 w-4" />
                                                 </Button>
+
                                                 <Button
-                                                    size="sm"
-                                                    variant="outline"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8"
+                                                    title="Şifre Sıfırla"
                                                     onClick={() => setPasswordDialog({ open: true, userId: user.id })}
                                                 >
                                                     <Key className="h-4 w-4" />
                                                 </Button>
+
                                                 <Button
-                                                    size="sm"
-                                                    variant="outline"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-destructive"
+                                                    title="Sil"
+                                                    disabled={user.id === currentUserId}
                                                     onClick={() => setDeleteDialog({ open: true, userId: user.id })}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -281,13 +359,55 @@ export function UserManagement() {
                 </CardContent>
             </Card>
 
+            {/* Edit User Dialog */}
+            <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, user: undefined })}>
+                <DialogContent>
+                    <form onSubmit={handleEditUser}>
+                        <DialogHeader>
+                            <DialogTitle>Kullanıcı Düzenle</DialogTitle>
+                            <DialogDescription>
+                                Kullanıcı bilgilerini güncelleyin.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label htmlFor="edit-username">Kullanıcı Adı</Label>
+                                <Input
+                                    id="edit-username"
+                                    name="username"
+                                    defaultValue={editDialog.user?.username}
+                                    required
+                                    minLength={3}
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="edit-name">Ad Soyad</Label>
+                                <Input
+                                    id="edit-name"
+                                    name="name"
+                                    defaultValue={editDialog.user?.name || ''}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setEditDialog({ open: false })}>
+                                İptal
+                            </Button>
+                            <Button type="submit">Güncelle</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             {/* Delete Dialog */}
             <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open })}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Kullanıcıyı Sil</DialogTitle>
                         <DialogDescription>
-                            Bu kullanıcıyı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                            Bu kullanıcıyı silmek istediğinizden emin misiniz? <br />
+                            <span className="font-bold text-destructive">UYARI: Kullanıcıya ait tüm raporlar ve veriler silinecektir!</span>
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -318,8 +438,8 @@ export function UserManagement() {
                                 name="newPassword"
                                 type="password"
                                 required
-                                minLength={6}
-                                placeholder="En az 6 karakter"
+                                minLength={4}
+                                placeholder="En az 4 karakter"
                             />
                         </div>
                         <DialogFooter>
@@ -399,7 +519,7 @@ export function UserManagement() {
                                     name="password"
                                     type="password"
                                     required
-                                    minLength={6}
+                                    minLength={4}
                                 />
                             </div>
                             <div>

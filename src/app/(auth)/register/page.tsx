@@ -39,8 +39,8 @@ export default function RegisterPage() {
             return
         }
 
-        if (password.length < 6) {
-            toast.error('Şifre en az 6 karakter olmalıdır')
+        if (password.length < 4) {
+            toast.error('Şifre en az 4 karakter olmalıdır')
             setLoading(false)
             return
         }
@@ -133,9 +133,9 @@ export default function RegisterPage() {
                                 id="password"
                                 name="password"
                                 type="password"
-                                placeholder="En az 6 karakter"
+                                placeholder="En az 4 karakter"
                                 required
-                                minLength={6}
+                                minLength={4}
                                 disabled={loading}
                             />
                         </div>
@@ -147,7 +147,7 @@ export default function RegisterPage() {
                                 type="password"
                                 placeholder="Şifrenizi tekrar girin"
                                 required
-                                minLength={6}
+                                minLength={4}
                                 disabled={loading}
                             />
                         </div>
