@@ -121,10 +121,10 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                             {(() => {
                                 const departureDate = format(new Date(data.dateRange.from), 'yyyy-MM-dd')
                                 const isExcluded = data.excludedDates?.some(
-                                    (d) => format(new Date(d), 'yyyy-MM-dd') === departureDate
+                                    (d: any) => format(new Date(d), 'yyyy-MM-dd') === departureDate
                                 )
                                 return (
-                                    <span style={{ marginLeft: '8px', fontSize: '11pt', color: '#555' }}>
+                                    <span style={{ marginLeft: '8px', fontSize: '11pt', fontStyle: 'italic' }}>
                                         {isExcluded ? '(çalışılmadı)' : '(çalışıldı)'}
                                     </span>
                                 )
@@ -136,10 +136,10 @@ export const ReportPdfTemplate: React.FC<ReportPdfTemplateProps> = ({ data, spec
                             {(() => {
                                 const returnDate = format(new Date(data.dateRange.to), 'yyyy-MM-dd')
                                 const isExcluded = data.excludedDates?.some(
-                                    (d) => format(new Date(d), 'yyyy-MM-dd') === returnDate
+                                    (d: any) => format(new Date(d), 'yyyy-MM-dd') === returnDate
                                 )
                                 return (
-                                    <span style={{ marginLeft: '8px', fontSize: '11pt', color: '#555' }}>
+                                    <span style={{ marginLeft: '8px', fontSize: '11pt', fontStyle: 'italic' }}>
                                         {isExcluded ? '(çalışılmadı)' : '(çalışıldı)'}
                                     </span>
                                 )
