@@ -621,25 +621,18 @@ export function ReportForm({ initialData, reportId, defaultUserName, defaultSign
             const imgWidth = 210
             const pageHeight = 297
             let imgHeight = (canvas.height * imgWidth) / canvas.width
-
-            // Calculate the total height in mm
-            // If the content is slightly larger than A4 (up to 40mm tolerance), 
-            // force it to fit on one page by scaling down the height
-            // This prevents a blank second page due to minor overflows or margins
-            if (imgHeight > pageHeight && imgHeight < pageHeight + 40) {
-                imgHeight = pageHeight
-            }
-
             let heightLeft = imgHeight
             let position = 0
 
+            // 1. First Page
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
             heightLeft -= pageHeight
 
-            // Add a larger tolerance (e.g., 20mm - 2cm) to avoid creating a new page for whitespace overflows
-            // The footer has 20mm bottom margin, so anything less than that is likely just empty space
-            const tolerance = 20
-            while (heightLeft > tolerance) {
+            // 2. Additional Pages (only if remaining content is significant)
+            // If leftover is just whitespace (e.g. footer margin, empty space), ignore it
+            // Tolerance: 80mm (~1/3 of page) to be safe against blank pages
+            // If user has actual content (20 items), it will exceed 80mm easily.
+            while (heightLeft >= 80) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
