@@ -13,6 +13,8 @@ import {
 } from "lucide-react"
 import { MobileNav } from "@/components/custom/MobileNav"
 import { ModeToggle } from "@/components/mode-toggle"
+import { getSiteSettings } from "@/app/actions/settings"
+import { UserNav } from "@/components/user-nav"
 
 export default async function DashboardLayout({
     children,
@@ -25,16 +27,21 @@ export default async function DashboardLayout({
     }
 
     const isAdmin = session.user.role === 'ADMIN'
+    const settings = await getSiteSettings()
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             {/* Mobile Navigation */}
-            <MobileNav userName={session.user.name || ''} userRole={session.user.role || 'USER'} />
+            <MobileNav
+                userName={session.user.name || ''}
+                userRole={session.user.role || 'USER'}
+                enableThemeSwitch={settings?.enableThemeSwitch}
+            />
 
             {/* Desktop Sidebar */}
             <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex sm:w-64 transition-all">
                 <div className="flex items-center gap-2 border-b px-4 py-4 h-[60px]">
-                    <span className="font-bold text-lg hidden sm:inline-block">ERMAK Rapor</span>
+                    <span className="font-bold text-lg hidden sm:inline-block">{settings?.siteName || 'ERMAK Rapor'}</span>
                     <span className="font-bold text-lg sm:hidden">ER</span>
                 </div>
                 <nav className="flex flex-col gap-4 px-2 sm:py-5">
@@ -57,16 +64,25 @@ export default async function DashboardLayout({
                         className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground sm:h-auto h-9 w-9 sm:w-auto justify-center sm:justify-start rounded-md transition-colors hover:bg-muted"
                     >
                         <Settings className="h-5 w-5" />
-                        <span className="hidden sm:inline">Ayarlar</span>
+                        <span className="hidden sm:inline">Kullanıcı Ayarları</span>
                     </Link>
                     {isAdmin && (
-                        <Link
-                            href="/admin/users"
-                            className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground sm:h-auto h-9 w-9 sm:w-auto justify-center sm:justify-start rounded-md transition-colors hover:bg-muted"
-                        >
-                            <Users className="h-5 w-5" />
-                            <span className="hidden sm:inline">Kullanıcı Yönetimi</span>
-                        </Link>
+                        <>
+                            <Link
+                                href="/admin/users"
+                                className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground sm:h-auto h-9 w-9 sm:w-auto justify-center sm:justify-start rounded-md transition-colors hover:bg-muted"
+                            >
+                                <Users className="h-5 w-5" />
+                                <span className="hidden sm:inline">Kullanıcı Yönetimi</span>
+                            </Link>
+                            <Link
+                                href="/admin/settings"
+                                className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground sm:h-auto h-9 w-9 sm:w-auto justify-center sm:justify-start rounded-md transition-colors hover:bg-muted"
+                            >
+                                <Settings className="h-5 w-5" />
+                                <span className="hidden sm:inline">Genel Ayarlar</span>
+                            </Link>
+                        </>
                     )}
                 </nav>
                 <div className="mt-auto flex flex-col items-center sm:items-start gap-4 px-2 py-5">
@@ -74,7 +90,8 @@ export default async function DashboardLayout({
                         <UserIcon className="h-5 w-5" />
                         <span className="hidden sm:inline text-sm font-medium">{session.user.name}</span>
                     </div>
-                    <form
+                    {/* Logout moved to UserNav */}
+                    {/* <form
                         action={async () => {
                             "use server"
                             await signOut()
@@ -85,15 +102,18 @@ export default async function DashboardLayout({
                             <LogOut className="h-5 w-5" />
                             <span className="hidden sm:inline">Çıkış Yap</span>
                         </Button>
-                    </form>
+                    </form> */}
                 </div>
                 <div className="px-4 py-2 border-t flex justify-center">
-                    <ModeToggle />
+                    {(settings?.enableThemeSwitch !== false) && <ModeToggle />}
                 </div>
             </aside>
 
             {/* Main Content */}
             <div className="flex flex-col sm:gap-4 sm:pl-64 sm:py-4 pt-[60px] sm:pt-4">
+                <header className="hidden sm:flex h-14 items-center justify-end gap-4 border-b bg-background px-6">
+                    <UserNav userName={session.user.name || 'Kullanıcı'} />
+                </header>
                 <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
                     {children}
                 </main>

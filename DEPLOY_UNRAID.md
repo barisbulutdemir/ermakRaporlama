@@ -46,7 +46,13 @@ Bilgisayarınızda değişiklik yapıp GitHub'a gönderdikten sonra, Unraid term
     ```bash
     git pull
     ```
-3.  Yeniden başlatın:
+    git pull
+    ```
+4.  Veritabanını Güncelleyin (Önemli!):
+    ```bash
+    docker-compose exec ermak-rapor-app npx prisma migrate deploy
+    ```
+5.  Yeniden başlatın (Eğer gerekirse):
     ```bash
     docker-compose up -d --build
     ```

@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcrypt"
 import { z } from "zod"
 
-async function getUser(username: string) {
+import { User } from "@prisma/client"
+
+async function getUser(username: string): Promise<any> {
     try {
         const user = await prisma.user.findUnique({
             where: { username },
@@ -16,7 +18,12 @@ async function getUser(username: string) {
     }
 }
 
+import { authConfig } from "./auth.config"
+
+// ... existing code ...
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+    ...authConfig,
     trustHost: true,
     providers: [
         Credentials({
@@ -47,10 +54,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
         }),
     ],
-    pages: {
-        signIn: "/login",
-    },
+    // pages config is inherited from authConfig
     callbacks: {
+        ...authConfig.callbacks, // Include authorized callback
         async session({ session, token }) {
             if (token.sub && session.user) {
                 session.user.name = token.name as string

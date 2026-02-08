@@ -1,6 +1,6 @@
 'use server'
 
-import { signIn } from '@/auth'
+import { signIn, signOut } from '@/auth'
 import { AuthError } from 'next-auth'
 
 export async function authenticate(
@@ -8,20 +8,23 @@ export async function authenticate(
     formData: FormData,
 ) {
     try {
-        await signIn('credentials', {
-            ...Object.fromEntries(formData),
-            redirect: true,
-            redirectTo: '/dashboard'
-        })
+        await signIn('credentials', formData)
     } catch (error) {
         if (error instanceof AuthError) {
             switch (error.type) {
                 case 'CredentialsSignin':
-                    return 'Invalid credentials.'
+                    return 'Hatalı kullanıcı adı veya şifre.'
                 default:
-                    return 'Something went wrong.'
+                    return 'Bir sorun oluştu.'
             }
         }
         throw error
     }
+}
+
+import { redirect } from 'next/navigation'
+
+export async function logout() {
+    await signOut({ redirect: false })
+    redirect("/login")
 }

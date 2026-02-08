@@ -33,7 +33,7 @@ export default function LoginPage() {
                                 id="username"
                                 name="username"
                                 type="text"
-                                placeholder="admin"
+                                autoComplete="username"
                                 required
                             />
                         </div>
@@ -43,6 +43,7 @@ export default function LoginPage() {
                                 id="password"
                                 name="password"
                                 type="password"
+                                autoComplete="current-password"
                                 required
                             />
                         </div>

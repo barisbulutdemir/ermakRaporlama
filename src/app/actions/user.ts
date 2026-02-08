@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 // Check if current user is admin
-async function requireAdmin() {
+export async function requireAdmin() {
     const session = await auth()
     if (!session?.user || session.user.role !== 'ADMIN') {
         throw new Error('Unauthorized: Admin access required')
@@ -113,8 +113,8 @@ export async function createUser(data: {
 }) {
     const session = await requireAdmin()
 
-    if (data.password.length < 6) {
-        return { success: false, error: 'Password must be at least 6 characters' }
+    if (data.password.length < 4) {
+        return { success: false, error: 'Password must be at least 4 characters' }
     }
 
     try {
@@ -179,8 +179,8 @@ export async function registerUser(data: {
     password: string
     name: string
 }) {
-    if (data.password.length < 6) {
-        return { success: false, error: 'Password must be at least 6 characters' }
+    if (data.password.length < 4) {
+        return { success: false, error: 'Password must be at least 4 characters' }
     }
 
     if (!data.username || data.username.length < 3) {

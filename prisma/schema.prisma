@@ -100,3 +100,15 @@ model OfficialHoliday {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model SiteSettings {
+  id          String   @id @default(cuid())
+  siteName    String   @default("ERMAK Rapor")
+  description String   @default("Servis Raporlama Sistemi")
+  contactEmail String?
+  contactPhone String?
+  aboutText   String   @default("") // HTML or Markdown content
+  enableThemeSwitch Boolean @default(true)
+  debugMode   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}

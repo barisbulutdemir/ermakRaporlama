@@ -80,6 +80,18 @@ async function main() {
         })
     }
     console.log('Holidays seeded.')
+
+    const settingsCount = await prisma.siteSettings.count()
+    if (settingsCount === 0) {
+        await prisma.siteSettings.create({
+            data: {
+                siteName: 'ERMAK Rapor',
+                description: 'Servis Raporlama ve Yönetim Sistemi',
+                aboutText: '<h2>Hakkımızda</h2><p>ERMAK Raporlama Sistemi, servis süreçlerini dijitalleştirmek ve verimliliği artırmak için geliştirilmiştir.</p>',
+            }
+        })
+        console.log('Default site settings seeded.')
+    }
 }
 
 main()

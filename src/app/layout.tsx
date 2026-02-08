@@ -19,26 +19,33 @@ export const metadata: Metadata = {
   description: "Service Report Application",
 };
 
-export default function RootLayout({
+import { getSiteSettings } from "@/app/actions/settings"
+import { SettingsProvider } from "@/components/providers/settings-provider"
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const settings = await getSiteSettings()
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <SettingsProvider initialSettings={settings}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </SettingsProvider>
       </body>
     </html>
   );

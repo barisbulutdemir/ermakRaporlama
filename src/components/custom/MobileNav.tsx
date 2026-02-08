@@ -8,13 +8,15 @@ import {
     Users
 } from 'lucide-react'
 import { ModeToggle } from "@/components/mode-toggle"
+import { UserNav } from "@/components/user-nav"
 
 interface MobileNavProps {
     userName: string
     userRole: string
+    enableThemeSwitch?: boolean
 }
 
-export function MobileNav({ userName, userRole }: MobileNavProps) {
+export function MobileNav({ userName, userRole, enableThemeSwitch = true }: MobileNavProps) {
     const isAdmin = userRole === 'ADMIN'
 
     return (
@@ -39,19 +41,29 @@ export function MobileNav({ userName, userRole }: MobileNavProps) {
                     className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
                 >
                     <Settings className="h-6 w-6" />
-                    <span className="text-xs">Ayarlar</span>
+                    <span className="text-xs">Kullanıcı Ayarları</span>
                 </Link>
                 {isAdmin && (
-                    <Link
-                        href="/admin/users"
-                        className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <Users className="h-6 w-6" />
-                        <span className="text-xs">Kullanıcılar</span>
-                    </Link>
+                    <>
+                        <Link
+                            href="/admin/users"
+                            className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <Users className="h-6 w-6" />
+                            <span className="text-xs">Kullanıcılar</span>
+                        </Link>
+                        <Link
+                            href="/admin/settings"
+                            className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <Settings className="h-6 w-6" />
+                            <span className="text-xs">Genel Ayarlar</span>
+                        </Link>
+                    </>
                 )}
-                <div className="flex items-center">
-                    <ModeToggle />
+                <div className="flex items-center gap-2">
+                    {enableThemeSwitch && <ModeToggle />}
+                    <UserNav userName={userName} />
                 </div>
             </nav>
         </div>
