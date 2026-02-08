@@ -104,7 +104,7 @@ export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportR
 
         reportModifiers[modifierKey] = daysInRange
         reportModifiersStyles[modifierKey] = {
-            backgroundColor: report.siteColor ? `${report.siteColor}20` : '#3b82f620', // 20 = ~12% opacity in hex
+            backgroundColor: report.siteColor ? `${report.siteColor}40` : '#3b82f640', // 40 = ~25% opacity
             borderRadius: '0.375rem'
         }
     })
