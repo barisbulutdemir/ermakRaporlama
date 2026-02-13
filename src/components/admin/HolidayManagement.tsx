@@ -84,16 +84,14 @@ export function HolidayManagement({ initialHolidays }: HolidayManagementProps) {
 
     const onAddSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
-            const result = await addOfficialHoliday(values)
+            const result = await addOfficialHoliday({
+                ...values,
+                isHalfDay: values.isHalfDay ?? false,
+            })
             if (result.success) {
                 toast.success("Tatil eklendi")
                 setIsAddOpen(false)
                 addForm.reset()
-                // Optimistic update or wait for server revalidation?
-                // For simplicity, we trust revalidatePath but let's also close dialog.
-                // Since this is a client state derived from props, we might not see update immediately 
-                // unless we refresh or router.refresh(). 
-                // Ideally we should use router.refresh() 
             } else {
                 toast.error(result.error || "Hata oluştu")
             }
@@ -125,7 +123,10 @@ export function HolidayManagement({ initialHolidays }: HolidayManagementProps) {
         if (!editingHoliday) return
 
         try {
-            const result = await updateOfficialHoliday(editingHoliday.id, values)
+            const result = await updateOfficialHoliday(editingHoliday.id, {
+                ...values,
+                isHalfDay: values.isHalfDay ?? false,
+            })
             if (result.success) {
                 toast.success("Tatil güncellendi")
                 setEditingHoliday(null)
