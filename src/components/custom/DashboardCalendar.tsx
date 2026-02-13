@@ -1,21 +1,21 @@
 'use client'
 
 import { useState } from "react"
-import { Calendar } from "@/components/ui/calendar"
+import { Calendar, CalendarDayButton } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { format, isWithinInterval, isSameDay } from "date-fns"
 import { tr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-// import { deleteReport } from "@/app/actions/report" // If needed, or pass as prop
+import { deleteReport } from "@/app/actions/report"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Trash2, Pencil } from "lucide-react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { DayClickEventHandler, Modifiers, ModifiersStyles } from "react-day-picker"
+import { Trash2, Pencil, MapPin } from "lucide-react"
 
-// Type definitions matching usage in page.tsx
-export interface ReportRange {
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
+
+type ReportRange = {
     id: string
     siteName: string
     siteColor: string | null
@@ -24,63 +24,98 @@ export interface ReportRange {
     excludedDates: Date[]
 }
 
-export interface Holiday {
-    id: string
+type Holiday = {
     date: Date
-    description: string | null
     isHalfDay: boolean
 }
 
-interface DashboardCalendarProps {
-    reports: ReportRange[]
-    holidays: Holiday[]
-}
-
-export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarProps) {
+export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportRange[], holidays?: Holiday[] }) {
     const router = useRouter()
-    // const [deletingId, setDeletingId] = useState<string | null>(null) // Deletion logic might need to be passed down or re-implemented if actions are available
+    const [deletingId, setDeletingId] = useState<string | null>(null)
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
 
     // Helper to find report for a day (filtered for 'worked' visual)
     const getReportForDay = (day: Date) => {
-        // Check if Holiday (full day only) - holidays take precedence for "work" status? 
-        // Or do we show both? Usually holiday blocks work.
-        const holiday = holidays.find(h => isSameDay(new Date(h.date), day))
+        // Ensure day is a Date
+        const currentDay = new Date(day)
+
+        // Check if Holiday (full day only)
+        // Ensure h.date is converted to Date object as it might be a string from JSON
+        const holiday = holidays.find(h => isSameDay(new Date(h.date), currentDay))
         if (holiday && !holiday.isHalfDay) return undefined
 
-        return reports.find(r =>
-            isWithinInterval(day, { start: new Date(r.startDate), end: new Date(r.endDate) }) &&
-            !r.excludedDates.some(ex => isSameDay(new Date(ex), day))
-        )
+        return reports.find(r => {
+            const start = new Date(r.startDate)
+            const end = new Date(r.endDate)
+            // Fix: ensure excludedDates items are verified as Dates
+            const isExcluded = r.excludedDates.some(ex => isSameDay(new Date(ex), currentDay))
+
+            return isWithinInterval(currentDay, { start, end }) && !isExcluded
+        })
     }
 
-    // Handler for date selection
-    const handleDayClick: DayClickEventHandler = (day, modifiers) => {
-        const report = getReportForDay(day)
-        setSelectedDate(day)
-    }
+    const handleDelete = async (id: string) => {
+        const confirm = window.confirm("Bu raporu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")
+        if (!confirm) return
 
-    // Custom modifiers for react-day-picker
-    // Custom modifiers for react-day-picker
-    const reportModifiers = {
-        hasReport: (date: Date) => !!getReportForDay(date),
-        isHoliday: (date: Date) => holidays.some(h => isSameDay(new Date(h.date), date)),
-        isHalfDayHoliday: (date: Date) => holidays.some(h => isSameDay(new Date(h.date), date) && h.isHalfDay),
-    }
-
-    const reportModifiersStyles: ModifiersStyles = {
-        hasReport: {
-            fontWeight: 'bold',
-        },
-        isHoliday: {
-            color: '#dc2626', // red-600
-        },
-        isHalfDayHoliday: {
-            color: '#ea580c', // orange-600
+        setDeletingId(id)
+        try {
+            const result = await deleteReport(id)
+            if (result.success) {
+                toast.success("Rapor başarıyla silindi.")
+                // Refresh to update list and calendar
+                router.refresh()
+                setSelectedDate(undefined) // Reset selection
+            } else {
+                toast.error(result.message || "Silme işlemi başarısız.")
+            }
+        } catch (error) {
+            toast.error("Bir hata oluştu.")
+        } finally {
+            setDeletingId(null)
         }
     }
 
+    // Get report for selected date to display in Info Card
     const selectedReport = selectedDate ? getReportForDay(selectedDate) : null
+
+    // Create modifiers for each report to color the background
+    const reportModifiers: Record<string, Date[]> = {}
+    const reportModifiersStyles: Record<string, React.CSSProperties> = {}
+
+    reports.forEach((report, index) => {
+        const modifierKey = `report_${index}`
+        const daysInRange: Date[] = []
+
+        if (report.startDate && report.endDate) {
+            const start = new Date(report.startDate)
+            const end = new Date(report.endDate)
+
+            // Iterate through all days in the range
+            let currentDate = new Date(start)
+            while (currentDate <= end) {
+                const currentDay = new Date(currentDate)
+
+                // Check if this day should be shown as "worked"
+                const holiday = holidays.find(h => isSameDay(new Date(h.date), currentDay))
+                const isFullHoliday = holiday && !holiday.isHalfDay
+                const isExcluded = report.excludedDates.some(ex => isSameDay(new Date(ex), currentDay))
+
+                if (!isFullHoliday && !isExcluded) {
+                    daysInRange.push(new Date(currentDay))
+                }
+
+                // Move to next day
+                currentDate.setDate(currentDate.getDate() + 1)
+            }
+        }
+
+        reportModifiers[modifierKey] = daysInRange
+        reportModifiersStyles[modifierKey] = {
+            backgroundColor: report.siteColor ? `${report.siteColor}40` : '#3b82f640', // 40 = ~25% opacity
+            borderRadius: '0.375rem'
+        }
+    })
 
     return (
         <div className="flex flex-col gap-4">
@@ -88,7 +123,7 @@ export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarP
                 <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onDayClick={handleDayClick}
+                    onSelect={setSelectedDate}
                     locale={tr}
                     className="rounded-md border p-2 w-full flex justify-center"
                     modifiers={reportModifiers}
@@ -97,55 +132,33 @@ export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarP
                         ...reportModifiersStyles
                     }}
                     components={{
-                        Day: (props) => {
-                            const { day, ...divProps } = props;
-                            const date = day.date;
+                        DayButton: (props) => {
+                            const { day } = props
+                            const date = day.date
                             const report = getReportForDay(date)
                             const isToday = isSameDay(date, new Date())
 
                             return (
-                                <div {...divProps} className={cn(props.className, "p-0 relative h-full w-full flex items-center justify-center")}>
-                                    <div className="w-full h-full flex flex-col items-center justify-center cursor-pointer group gap-0.5"
-                                        onClick={(e) => {
-                                            props.onClick?.(e);
-                                        }}>
-                                        {/* Date Number */}
-                                        <span className={cn(
-                                            "text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center transition-all",
-                                            isToday ? "bg-primary text-primary-foreground" : "text-foreground group-hover:bg-muted"
-                                        )}>
-                                            {format(date, 'd')}
-                                        </span>
+                                <CalendarDayButton {...props}>
+                                    {/* Date Number */}
+                                    <span className={cn(
+                                        "text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center transition-all",
+                                        isToday ? "bg-primary text-primary-foreground" : "text-foreground"
+                                    )}>
+                                        {format(date, 'd')}
+                                    </span>
 
-                                        {/* Colored Dot/Bar if Report Exists */}
-                                        {report && (
-                                            <div
-                                                className="w-full max-w-[90%] h-1.5 rounded-full shadow-sm transition-all hover:brightness-110"
-                                                style={{ backgroundColor: report.siteColor || '#3b82f6' }}
-                                                title={report.siteName}
-                                            />
-                                        )}
-                                    </div>
-                                </div>
+                                    {/* Colored Dot/Bar if Report Exists (Compact) */}
+                                    {report && (
+                                        <div
+                                            className="w-full max-w-[90%] h-1.5 rounded-full shadow-sm"
+                                            style={{ backgroundColor: report.siteColor || '#3b82f6' }}
+                                        />
+                                    )}
+                                </CalendarDayButton>
                             )
                         }
                     }}
-                    footer={
-                        <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
-                            <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                <span>Rapor</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-red-600 font-bold">●</span>
-                                <span>Tatil</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-orange-600 font-bold">●</span>
-                                <span>Yarım Gün</span>
-                            </div>
-                        </div>
-                    }
                 />
             </div>
 
@@ -170,14 +183,22 @@ export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarP
                                 <p className="text-xs text-muted-foreground">
                                     Bu tarihte şantiyedesiniz.
                                 </p>
-                                <div className="grid grid-cols-1 gap-2 mt-2">
+                                <div className="grid grid-cols-2 gap-2 mt-2">
                                     <Button size="sm" variant="outline" className="h-8 text-xs w-full" asChild>
-                                        <Link href={`/reports/${selectedReport.id}/edit`}>
+                                        <Link href={`/reports/${selectedReport.id}`}>
                                             <Pencil className="w-3 h-3 mr-2" />
-                                            Raporu Düzenle
+                                            Düzenle
                                         </Link>
                                     </Button>
-                                    {/* Delete button removed for simplicity as it requires server action passing or implementation. Can be added back if needed. */}
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="h-8 text-xs w-full"
+                                        onClick={() => handleDelete(selectedReport.id)}
+                                        disabled={deletingId === selectedReport.id}
+                                    >
+                                        {deletingId === selectedReport.id ? "Siliniyor..." : "Sil"}
+                                    </Button>
                                 </div>
                             </div>
                         ) : (
