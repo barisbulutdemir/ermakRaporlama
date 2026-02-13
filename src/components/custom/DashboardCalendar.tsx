@@ -1,121 +1,123 @@
 'use client'
 
-import { useState } from "react"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Button } from "@/components/ui/button"
-import { format, isWithinInterval, isSameDay } from "date-fns"
-import { tr } from "date-fns/locale"
-import { cn } from "@/lib/utils"
-import { deleteReport } from "@/app/actions/report"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Trash2, Pencil, MapPin } from "lucide-react"
+import { useState } from 'react'
+import { Calendar } from '@/components/ui/calendar'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
+import { tr } from 'date-fns/locale'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { FileText, Calendar as CalendarIcon, Clock, MapPin, Building, User } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import Link from 'next/link'
+import { DayClickEventHandler, Modifiers, ModifiersStyles } from 'react-day-picker'
 
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
-
-type ReportRange = {
+// Type definitions
+interface Project {
     id: string
-    siteName: string
-    siteColor: string | null
-    startDate: Date
-    endDate: Date
-    excludedDates: Date[]
+    name: string
+    code: string
 }
 
-type Holiday = {
+interface User {
+    id: string
+    name: string | null
+}
+
+interface ServiceReport {
+    id: string
+    reportDate: Date
+    startTime: string
+    endTime: string
+    customerName: string
+    location: string
+    status: string
+    project: Project
+    technician: User
+}
+
+interface Holiday {
+    id: string
     date: Date
+    description: string
     isHalfDay: boolean
 }
 
-export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportRange[], holidays?: Holiday[] }) {
-    const router = useRouter()
-    const [deletingId, setDeletingId] = useState<string | null>(null)
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+interface DashboardCalendarProps {
+    reports: ServiceReport[]
+    holidays: Holiday[]
+}
 
-    // Helper to find report for a day (filtered for 'worked' visual)
+export function DashboardCalendar({ reports, holidays }: DashboardCalendarProps) {
+    const [date, setDate] = useState<Date | undefined>(new Date())
+    const [selectedDateReports, setSelectedDateReports] = useState<ServiceReport[]>([])
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+    // Helper to find reports for a specific date
+    const getReportsForDay = (day: Date) => {
+        return reports.filter(report => isSameDay(new Date(report.reportDate), day))
+    }
+
+    // Handle date selection
+    const handleDayClick: DayClickEventHandler = (day, modifiers) => {
+        const dayReports = getReportsForDay(day)
+        setSelectedDateReports(dayReports)
+        setDate(day)
+
+        if (dayReports.length > 0) {
+            setIsDialogOpen(true)
+        }
+    }
+
+    // Custom modifiers for react-day-picker
+    const reportModifiers: Modifiers = {
+        hasReport: (date) => getReportsForDay(date).length > 0,
+        isHoliday: (date) => holidays.some(h => isSameDay(new Date(h.date), date)),
+        isHalfDayHoliday: (date) => holidays.some(h => isSameDay(new Date(h.date), date) && h.isHalfDay),
+    }
+
+    const reportModifiersStyles: ModifiersStyles = {
+        hasReport: {
+            fontWeight: 'bold',
+            // textDecoration: 'underline', // removed for cleaner look with dot
+        },
+        isHoliday: {
+            color: '#dc2626', // red-600
+        },
+        isHalfDayHoliday: {
+            color: '#ea580c', // orange-600
+        }
+    }
+
+    // Function to get holiday description
+    const getHolidayDescription = (date: Date) => {
+        const holiday = holidays.find(h => isSameDay(new Date(h.date), date))
+        return holiday ? holiday.description : null
+    }
+
     const getReportForDay = (day: Date) => {
-        // Check if Holiday (full day only)
-        const holiday = holidays.find(h => isSameDay(h.date, day))
-        if (holiday && !holiday.isHalfDay) return undefined
-
-        return reports.find(r =>
-            isWithinInterval(day, { start: r.startDate, end: r.endDate }) &&
-            !r.excludedDates.some(ex => isSameDay(ex, day))
-        )
+        return reports.find(report => isSameDay(new Date(report.reportDate), day))
     }
 
-    const handleDelete = async (id: string) => {
-        const confirm = window.confirm("Bu raporu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")
-        if (!confirm) return
-
-        setDeletingId(id)
-        try {
-            const result = await deleteReport(id)
-            if (result.success) {
-                toast.success("Rapor başarıyla silindi.")
-                // Refresh to update list and calendar
-                router.refresh()
-                setSelectedDate(undefined) // Reset selection
-            } else {
-                toast.error(result.message || "Silme işlemi başarısız.")
-            }
-        } catch (error) {
-            toast.error("Bir hata oluştu.")
-        } finally {
-            setDeletingId(null)
-        }
-    }
-
-    // Get report for selected date to display in Info Card
-    const selectedReport = selectedDate ? getReportForDay(selectedDate) : null
-
-    // Create modifiers for each report to color the background
-    const reportModifiers: Record<string, Date[]> = {}
-    const reportModifiersStyles: Record<string, React.CSSProperties> = {}
-
-    reports.forEach((report, index) => {
-        const modifierKey = `report_${index}`
-        const daysInRange: Date[] = []
-
-        if (report.startDate && report.endDate) {
-            const start = new Date(report.startDate)
-            const end = new Date(report.endDate)
-
-            // Iterate through all days in the range
-            let currentDate = new Date(start)
-            while (currentDate <= end) {
-                const currentDay = new Date(currentDate)
-
-                // Check if this day should be shown as "worked"
-                const holiday = holidays.find(h => isSameDay(h.date, currentDay))
-                const isFullHoliday = holiday && !holiday.isHalfDay
-                const isExcluded = report.excludedDates.some(ex => isSameDay(ex, currentDay))
-
-                if (!isFullHoliday && !isExcluded) {
-                    daysInRange.push(new Date(currentDay))
-                }
-
-                // Move to next day
-                currentDate.setDate(currentDate.getDate() + 1)
-            }
-        }
-
-        reportModifiers[modifierKey] = daysInRange
-        reportModifiersStyles[modifierKey] = {
-            backgroundColor: report.siteColor ? `${report.siteColor}40` : '#3b82f640', // 40 = ~25% opacity
-            borderRadius: '0.375rem'
-        }
-    })
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="p-2 border rounded-md w-full">
+        <Card className="h-full">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-primary" />
+                    Rapor Takvimi
+                </CardTitle>
+                <CardDescription>
+                    Rapor ve resmi tatil günleri
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
                 <Calendar
                     mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
+                    selected={date}
+                    onDayClick={handleDayClick}
                     locale={tr}
                     className="rounded-md border p-2 w-full flex justify-center"
                     modifiers={reportModifiers}
@@ -123,35 +125,8 @@ export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportR
                         selected: { backgroundColor: 'transparent', border: '2px solid var(--primary)', borderRadius: '100%' },
                         ...reportModifiersStyles
                     }}
-                    components={{
-                        // DayContent is deprecated or incorrect in v9, use Day or custom render
-                        // Checking docs: v8 used DayContent. v9 uses components.Day for the whole day or props.
-                        // Actually, for v9, the content is usually 'DayContent' but seemingly typed differently or removed.
-                        // Let's try matching the exact type or using 'Day' if we want to override the whole cell, 
-                        // but here we just want content. 
-                        // Required fix: 'DayContent' -> 'Day' is too broad. 
-                        // If 'DayContent' is invalid, it might be 'InternalDay' or similar? 
-                        // Wait, v9 removed DayContent in favor of children? 
-                        // Let's look at the error: 'DayContent' does not exist in 'Partial<CustomComponents>'.
-                        // Available might be: Day, Caption, ...
-                        // Let's try to remove it and put logical rendering inside a custom Day wrapper?
-                        // Or better, let's use the 'formatters' if available, but we need custom JSX.
-                        // Correct approach for v9 custom content:
-                        // use 'components={{ Day: CustomDay }}' and render content inside.
-                        // OR check if 'day-content' is the key (kebab case?). No.
-                        // Let's try 'Day' and see if we can render default + badge.
-
-                        // actually, looking at v9 docs, it seems `DayContent` WAS removed.
-                        // We should likely use `Cell` or just `Day` and render children.
-                        // BUT, to be safe and quick: The error says keys are restricted.
-                        // Let's try to comment it out for a sec? No, feature needed.
-                        // Let's change 'DayContent' to 'Day' and adapt props. 
-                        // Day takes Update: DayContent is valid in v8. v9 might have renamed it.
-                        // Let's try overriding 'Day' and rendering props.children? 
-                        // Actually, let's look at lines 127-145: it renders the number and the dot.
-                        // So it IS the content. 
-                        // Let's try changing key to 'Day'.
-                        Day: ({ date, displayMonth }) => {
+                    formatters={{
+                        formatDay: (date) => {
                             const report = getReportForDay(date)
                             const isToday = isSameDay(date, new Date())
 
@@ -165,75 +140,95 @@ export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportR
                                         {format(date, 'd')}
                                     </span>
 
-                                    {/* Colored Dot/Bar if Report Exists (Compact) */}
-                                    {report && (
-                                        <div
-                                            className="w-full max-w-[90%] h-1.5 rounded-full shadow-sm transition-all hover:brightness-110"
-                                            style={{ backgroundColor: report.siteColor || '#3b82f6' }}
-                                        />
-                                    )}
+                                    {/* Dots for Reports */}
+                                    <div className="flex gap-0.5 h-1.5 justify-center w-full">
+                                        {report && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Rapor Var" />
+                                        )}
+                                        {/* Holidays handled by modifiers but we can verify here too if needed */}
+                                    </div>
                                 </div>
                             )
                         }
                     }}
+                    footer={
+                        <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
+                            <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                <span>Rapor</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-red-600 font-bold">●</span>
+                                <span>Tatil</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-orange-600 font-bold">●</span>
+                                <span>Yarım Gün</span>
+                            </div>
+                        </div>
+                    }
                 />
-            </div>
 
-            {/* Info Section - Toggles between Total Summary and Selected Details */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        {selectedDate ? format(selectedDate, 'd MMMM yyyy, EEEE', { locale: tr }) : "Toplam Rapor"}
-                    </CardTitle>
-                    {selectedDate && selectedReport && (
-                        <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: selectedReport.siteColor || '#3b82f6' }}
-                        />
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {selectedDate ? (
-                        selectedReport ? (
-                            <div className="space-y-2">
-                                <div className="text-xl font-bold">{selectedReport.siteName}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    Bu tarihte şantiyedesiniz.
-                                </p>
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                    <Button size="sm" variant="outline" className="h-8 text-xs w-full" asChild>
-                                        <Link href={`/reports/${selectedReport.id}`}>
-                                            <Pencil className="w-3 h-3 mr-2" />
-                                            Düzenle
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        className="h-8 text-xs w-full"
-                                        onClick={() => handleDelete(selectedReport.id)}
-                                        disabled={deletingId === selectedReport.id}
-                                    >
-                                        {deletingId === selectedReport.id ? "Siliniyor..." : "Sil"}
-                                    </Button>
+                {/* Dialog for listing reports on selected day */}
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {date && format(date, 'd MMMM yyyy', { locale: tr })} Raporları
+                            </DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="h-[300px] mt-4 pr-4">
+                            {selectedDateReports.length > 0 ? (
+                                <div className="space-y-4">
+                                    {selectedDateReports.map(report => (
+                                        <div key={report.id} className="border rounded-lg p-3 space-y-2 relative overflow-hidden">
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${report.status === 'COMPLETED' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+
+                                            <div className="flex justify-between items-start pl-2">
+                                                <div>
+                                                    <h4 className="font-semibold text-sm">{report.project.name}</h4>
+                                                    <p className="text-xs text-muted-foreground">{report.project.code}</p>
+                                                </div>
+                                                <Badge variant={report.status === 'COMPLETED' ? 'default' : 'secondary'} className="text-[10px]">
+                                                    {report.status === 'COMPLETED' ? 'Tamamlandı' : 'Taslak'}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 text-xs pl-2">
+                                                <div className="flex items-center gap-1 text-muted-foreground">
+                                                    <Clock className="w-3 h-3" />
+                                                    {report.startTime} - {report.endTime}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-muted-foreground">
+                                                    <User className="w-3 h-3" />
+                                                    {report.technician.name || 'Teknisyen'}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-muted-foreground col-span-2">
+                                                    <Building className="w-3 h-3" />
+                                                    {report.customerName}
+                                                </div>
+                                            </div>
+
+                                            <div className="pl-2 pt-1">
+                                                <Link href={`/reports/${report.id}`} passHref>
+                                                    <Button size="sm" variant="outline" className="w-full text-xs h-7">
+                                                        Detayları Görüntüle
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-1">
-                                <div className="text-lg font-semibold text-muted-foreground">Çalışma Yok</div>
-                                <p className="text-xs text-muted-foreground">
-                                    Seçilen tarihte herhangi bir rapor kaydı bulunamadı.
-                                </p>
-                            </div>
-                        )
-                    ) : (
-                        <>
-                            <div className="text-2xl font-bold">{reports.length}</div>
-                            <p className="text-xs text-muted-foreground">Son oluşturulan raporlarınız.</p>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                                    <p>Bu tarihte rapor bulunmuyor.</p>
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
+            </CardContent>
+        </Card>
     )
 }
