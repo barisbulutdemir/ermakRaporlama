@@ -61,10 +61,11 @@ export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarP
     }
 
     // Custom modifiers for react-day-picker
-    const reportModifiers: Modifiers = {
-        hasReport: (date) => !!getReportForDay(date),
-        isHoliday: (date) => holidays.some(h => isSameDay(new Date(h.date), date)),
-        isHalfDayHoliday: (date) => holidays.some(h => isSameDay(new Date(h.date), date) && h.isHalfDay),
+    // Custom modifiers for react-day-picker
+    const reportModifiers = {
+        hasReport: (date: Date) => !!getReportForDay(date),
+        isHoliday: (date: Date) => holidays.some(h => isSameDay(new Date(h.date), date)),
+        isHalfDayHoliday: (date: Date) => holidays.some(h => isSameDay(new Date(h.date), date) && h.isHalfDay),
     }
 
     const reportModifiersStyles: ModifiersStyles = {
