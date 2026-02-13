@@ -56,12 +56,17 @@ Bu yüzden Stack ayarlarında **Tam Yol (Absolute Path)** kullanmalıyız.
           # Şifrenizi buraya yazın:
           - AUTH_SECRET=BURAYA_OPENSSL_ILE_URETTIGINIZ_SIFREYI_YAZIN
         volumes:
-          # Veritabanı ve Uploads klasörleri de diskte tutulmalı:
+          # Verileri de diskte tut:
           - /mnt/user/appdata/ermakRaporlama/prisma:/app/prisma
           - /mnt/user/appdata/ermakRaporlama/public/uploads:/app/public/uploads
+    
+    # UNRAID ARAYÜZ AYARLARI (İsteğe bağlı):
+    labels:
+      - "net.unraid.docker.icon=https://raw.githubusercontent.com/barisbulutdemir/ermakRaporlama/main/public/app_icon_v2.png"
+      - "net.unraid.docker.webui=http://[IP]:[PORT:3000]"
     ```
 
-3.  `AUTH_SECRET` kısmını değiştirmeyi unutmayın!
+3.  `AUTH_SECRET` kısmını değiştirmeyi unutmayın.
 4.  **"SAVE CHANGES"** butonuna basın.
 5.  Son olarak **"COMPOSE UP"** butonuna tıklayın.
 
