@@ -19,10 +19,16 @@ En temiz ve yönetilebilir yöntem, Unraid'in **Docker Compose Manager** eklenti
 ### Adım 3: Kodları İndirin
 1.  Oluşturduğunuz `ermakRaporlama` stack'inin yanındaki **Terminal İkonuna** ( >_ ) tıklayın. (Bu işlem o klasörde terminal açar).
 2.  Açılan terminale şu komutu yapıştırın (kodları indirir):
-    ```bash
-    git clone https://github.com/barisbulutdemir/ermakRaporlama.git .
+    # 1. Önce doğru klasöre gidin (Stack isminizle aynı olmalı):
+    cd /mnt/user/appdata/ermakRaporlama
+
+    # 2. Klasör boş olmadığı için (Unraid dosya oluşturmuş olabilir), şu komutlarla zorla indirin:
+    git init
+    git remote add origin https://github.com/barisbulutdemir/ermakRaporlama.git
+    git fetch
+    git checkout -t origin/main -f
     ```
-    *(Dikkat: Komutun sonundaki nokta (.) önemlidir, dosyaları o anki klasöre indirir).*
+    *(Bu komutlar mevcut gereksiz dosyaları silip, Github'daki güncel dosyaları yükler).*
 
 ### Adım 4: Ayarlar ve Başlatma
 1.  Terminali kapatın.
