@@ -96,29 +96,36 @@ export function DashboardCalendar({ reports, holidays = [] }: DashboardCalendarP
                         selected: { backgroundColor: 'transparent', border: '2px solid var(--primary)', borderRadius: '100%' },
                         ...reportModifiersStyles
                     }}
-                    formatters={{
-                        formatDay: (date) => {
+                    components={{
+                        Day: (props) => {
+                            const { day, ...divProps } = props;
+                            const date = day.date;
                             const report = getReportForDay(date)
                             const isToday = isSameDay(date, new Date())
 
                             return (
-                                <div className="w-full h-full flex flex-col items-center justify-center cursor-pointer group gap-0.5">
-                                    {/* Date Number */}
-                                    <span className={cn(
-                                        "text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center transition-all",
-                                        isToday ? "bg-primary text-primary-foreground" : "text-foreground group-hover:bg-muted"
-                                    )}>
-                                        {format(date, 'd')}
-                                    </span>
+                                <div {...divProps} className={cn(props.className, "p-0 relative h-full w-full flex items-center justify-center")}>
+                                    <div className="w-full h-full flex flex-col items-center justify-center cursor-pointer group gap-0.5"
+                                        onClick={(e) => {
+                                            props.onClick?.(e);
+                                        }}>
+                                        {/* Date Number */}
+                                        <span className={cn(
+                                            "text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center transition-all",
+                                            isToday ? "bg-primary text-primary-foreground" : "text-foreground group-hover:bg-muted"
+                                        )}>
+                                            {format(date, 'd')}
+                                        </span>
 
-                                    {/* Colored Dot/Bar if Report Exists */}
-                                    {report && (
-                                        <div
-                                            className="w-full max-w-[90%] h-1.5 rounded-full shadow-sm transition-all hover:brightness-110"
-                                            style={{ backgroundColor: report.siteColor || '#3b82f6' }}
-                                            title={report.siteName}
-                                        />
-                                    )}
+                                        {/* Colored Dot/Bar if Report Exists */}
+                                        {report && (
+                                            <div
+                                                className="w-full max-w-[90%] h-1.5 rounded-full shadow-sm transition-all hover:brightness-110"
+                                                style={{ backgroundColor: report.siteColor || '#3b82f6' }}
+                                                title={report.siteName}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             )
                         }
