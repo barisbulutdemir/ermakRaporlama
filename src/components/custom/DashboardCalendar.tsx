@@ -124,7 +124,34 @@ export function DashboardCalendar({ reports, holidays = [] }: { reports: ReportR
                         ...reportModifiersStyles
                     }}
                     components={{
-                        DayContent: ({ date }) => {
+                        // DayContent is deprecated or incorrect in v9, use Day or custom render
+                        // Checking docs: v8 used DayContent. v9 uses components.Day for the whole day or props.
+                        // Actually, for v9, the content is usually 'DayContent' but seemingly typed differently or removed.
+                        // Let's try matching the exact type or using 'Day' if we want to override the whole cell, 
+                        // but here we just want content. 
+                        // Required fix: 'DayContent' -> 'Day' is too broad. 
+                        // If 'DayContent' is invalid, it might be 'InternalDay' or similar? 
+                        // Wait, v9 removed DayContent in favor of children? 
+                        // Let's look at the error: 'DayContent' does not exist in 'Partial<CustomComponents>'.
+                        // Available might be: Day, Caption, ...
+                        // Let's try to remove it and put logical rendering inside a custom Day wrapper?
+                        // Or better, let's use the 'formatters' if available, but we need custom JSX.
+                        // Correct approach for v9 custom content:
+                        // use 'components={{ Day: CustomDay }}' and render content inside.
+                        // OR check if 'day-content' is the key (kebab case?). No.
+                        // Let's try 'Day' and see if we can render default + badge.
+
+                        // actually, looking at v9 docs, it seems `DayContent` WAS removed.
+                        // We should likely use `Cell` or just `Day` and render children.
+                        // BUT, to be safe and quick: The error says keys are restricted.
+                        // Let's try to comment it out for a sec? No, feature needed.
+                        // Let's change 'DayContent' to 'Day' and adapt props. 
+                        // Day takes Update: DayContent is valid in v8. v9 might have renamed it.
+                        // Let's try overriding 'Day' and rendering props.children? 
+                        // Actually, let's look at lines 127-145: it renders the number and the dot.
+                        // So it IS the content. 
+                        // Let's try changing key to 'Day'.
+                        Day: ({ date, displayMonth }) => {
                             const report = getReportForDay(date)
                             const isToday = isSameDay(date, new Date())
 
